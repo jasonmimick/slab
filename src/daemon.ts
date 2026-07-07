@@ -7,6 +7,7 @@ import { loadState, saveState, allocateHostPort, getSecrets, setSecrets, deleteS
 import { loadManifest, parseDuration } from './manifest'
 import { createProxy } from './proxy'
 import { createEngine } from './engine'
+import { dashboardHtml } from './dashboard'
 
 const IDLE_REAP_INTERVAL_MS = 30_000
 const LAST_REQUEST_SAVE_THROTTLE_MS = 5_000
@@ -171,6 +172,11 @@ async function main(): Promise<void> {
   api.get('/v1/health', wrap(async (_req, res) => {
     res.json({ status: 'ok', apps: Object.keys(state.apps).length, proxyPort: PROXY_PORT })
   }))
+
+  api.get('/', (_req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.send(dashboardHtml(PROXY_PORT))
+  })
 
   api.use((_req, res) => {
     res.status(404).json({ error: 'not found' })
