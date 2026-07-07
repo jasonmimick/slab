@@ -173,6 +173,11 @@ async function act(name, verb) {
   await fetch('/v1/apps/' + name + '/' + verb, { method: 'POST' })
   load()
 }
+async function removeApp(name) {
+  if (!confirm('Remove ' + name + '? Its container and secrets are deleted; the source directory is untouched.')) return
+  await fetch('/v1/apps/' + name, { method: 'DELETE' })
+  load()
+}
 async function showLogs(name) {
   const r = await fetch('/v1/apps/' + name + '/logs?tail=200')
   const d = await r.json()
@@ -239,6 +244,7 @@ async function load() {
       +     (a.exposed
               ? '<button class="warn" onclick="act(\\'' + a.name + '\\',\\'hide\\')">hide</button>'
               : '<button class="hot" onclick="act(\\'' + a.name + '\\',\\'expose\\')">expose</button>')
+      +     '<button class="warn" onclick="removeApp(\\'' + a.name + '\\')">rm</button>'
       +   '</div>'
       + '</div>'
       + '</div>'
