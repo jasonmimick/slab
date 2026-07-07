@@ -42,8 +42,16 @@ export function dashboardHtml(proxyPort: number): string {
     display: grid; place-items: center; width: 46px; height: 46px;
     background: linear-gradient(180deg, var(--unit-hi), var(--unit-lo));
     border: 1px solid var(--edge); border-radius: 6px;
-    font-weight: 800; font-size: 21px;
+    font-weight: 800; font-size: 21px; cursor: pointer; position: relative;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 3px 8px rgba(0,0,0,.45);
+    transition: transform .12s ease, border-color .12s ease;
+  }
+  .spine span:hover { transform: translateX(2px); border-color: var(--amber); }
+  .spine span:hover::after {
+    content: attr(data-nav); position: absolute; left: 54px; white-space: nowrap;
+    font-size: 9px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--amber); background: rgba(10,11,13,.95); border: 1px solid var(--edge);
+    padding: 3px 8px; border-radius: 4px; z-index: 5;
   }
   .spine span:first-child {
     background: linear-gradient(180deg, #ffc36e, #f0a13e); color: #2a1e08; border-color: #b97f2e;
@@ -193,7 +201,13 @@ export function dashboardHtml(proxyPort: number): string {
   </div>
 </header>
 <div class="layout">
-  <div class="spine"><span>S</span><span>L</span><span>A</span><span>B</span><div class="vent"></div><div class="vent"></div></div>
+  <div class="spine">
+    <span data-nav="status" onclick="navStatus()">S</span>
+    <span data-nav="logs — all apps" onclick="navLogs()">L</span>
+    <span data-nav="api — raw json" onclick="window.open('/v1/apps')">A</span>
+    <span data-nav="boards — flip all" onclick="navBoards()">B</span>
+    <div class="vent"></div><div class="vent"></div>
+  </div>
   <div class="rack" id="rack"></div>
 </div>
 <footer>
@@ -320,6 +334,33 @@ async function load() {
   document.getElementById('s-apps').textContent = appsCache.length
   document.getElementById('s-run').textContent = appsCache.filter(a => a.state === 'running').length
   document.getElementById('s-rpm').innerHTML = totalRpm + '<em>/m</em>'
+  render()
+}
+async function navStatus() {
+  const r = await fetch('/v1/health')
+  const h = await r.json()
+  document.getElementById('dtitle').textContent = 'status'
+  document.getElementById('dbody').textContent = JSON.stringify(h, null, 2)
+  drawer.style.display = 'block'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+async function navLogs() {
+  document.getElementById('dtitle').textContent = 'logs — all apps'
+  document.getElementById('dbody').textContent = 'collecting…'
+  drawer.style.display = 'block'
+  const chunks = await Promise.all(appsCache.map(async a => {
+    if (a.state !== 'running') return ''
+    try {
+      const r = await fetch('/v1/apps/' + a.name + '/logs?tail=15')
+      const d = await r.json()
+      return '━━ ' + a.name + ' ' + '━'.repeat(Math.max(4, 40 - a.name.length)) + '\\n' + (d.logs ?? d.error ?? '')
+    } catch { return '' }
+  }))
+  document.getElementById('dbody').textContent = chunks.filter(Boolean).join('\\n') || 'no running apps'
+}
+function navBoards() {
+  if (openBays.size) openBays.clear()
+  else for (const a of appsCache) openBays.add(a.name)
   render()
 }
 function tick() {
