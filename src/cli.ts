@@ -183,6 +183,23 @@ program
   .action(action(async (name: string) => {
     const [{ app }, { proxyPort }] = await Promise.all([client.getApp(name), client.health()])
     console.log(appUrl(app, proxyPort))
+    if (app.publicUrl) console.log(app.publicUrl)
+  }))
+
+program
+  .command('expose <name>')
+  .description('open a public https url (cloudflare quick tunnel)')
+  .action(action(async (name: string) => {
+    const { app } = await client.expose(name)
+    console.log(`exposed ${app.name} -> ${app.publicUrl}`)
+  }))
+
+program
+  .command('hide <name>')
+  .description('close the public url')
+  .action(action(async (name: string) => {
+    await client.hide(name)
+    console.log(`hidden ${name}`)
   }))
 
 program

@@ -37,6 +37,8 @@ export const client = {
   logs: (name: string, tail = 100) => req<{ logs: string }>('GET', `/v1/apps/${name}/logs?tail=${tail}`),
   setSecrets: (name: string, values: Record<string, string>) => req<void>('PUT', `/v1/apps/${name}/secrets`, { values }),
   listSecretKeys: (name: string) => req<{ keys: string[] }>('GET', `/v1/apps/${name}/secrets`),
+  expose: (name: string) => req<{ app: AppRecord }>('POST', `/v1/apps/${name}/expose`),
+  hide: (name: string) => req<{ app: AppRecord }>('POST', `/v1/apps/${name}/hide`),
 }
 
 export function appUrl(app: AppRecord, proxyPort: number): string {

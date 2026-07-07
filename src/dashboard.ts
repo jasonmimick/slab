@@ -66,7 +66,8 @@ async function load() {
       + '<td class="type">' + a.manifest.type + (a.manifest.image ? ' · ' + a.manifest.image : '') + '</td>'
       + '<td><span class="state ' + a.state + '">' + a.state + '</span>'
       + (a.error ? '<div class="err">' + a.error.slice(0, 120) + '</div>' : '') + '</td>'
-      + '<td><a href="' + url + '" target="_blank">' + a.name + '.localhost</a></td>'
+      + '<td><a href="' + url + '" target="_blank">' + a.name + '.localhost</a>'
+      + (a.publicUrl ? '<br><a href="' + a.publicUrl + '" target="_blank">' + a.publicUrl.replace('https://','') + '</a>' : '') + '</td>'
       + '<td>' + rel(a.deployedAt) + '</td>'
       + '<td>'
       + '<button onclick="act(\\'' + a.name + '\\',\\'deploy\\')">deploy</button>'
@@ -74,6 +75,9 @@ async function load() {
           ? '<button onclick="act(\\'' + a.name + '\\',\\'stop\\')">stop</button>'
           : '<button onclick="act(\\'' + a.name + '\\',\\'start\\')">start</button>')
       + '<button onclick="showLogs(\\'' + a.name + '\\')">logs</button>'
+      + (a.exposed
+          ? '<button onclick="act(\\'' + a.name + '\\',\\'hide\\')">hide</button>'
+          : '<button onclick="act(\\'' + a.name + '\\',\\'expose\\')">expose</button>')
       + '</td></tr>'
   }).join('') || '<tr><td colspan="6" style="color:#5b6672">no apps — slab deploy ./yourapp</td></tr>'
 }

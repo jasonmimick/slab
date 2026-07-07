@@ -30,6 +30,8 @@ export interface AppRecord {
   createdAt: string
   deployedAt: string | null
   error: string | null      // last error message when state === 'error'
+  exposed: boolean          // user asked for a public tunnel (re-opened on daemon boot)
+  publicUrl: string | null  // current trycloudflare.com URL (changes per tunnel session)
 }
 
 export interface SlabState {
@@ -51,6 +53,8 @@ export interface SlabState {
 //   GET    /v1/apps/:name/logs?tail=100 -> { logs: string }
 //   PUT    /v1/apps/:name/secrets       -> body { values: Record<string,string> } (merge) -> 204
 //   GET    /v1/apps/:name/secrets       -> { keys: string[] }  (names only, never values)
+//   POST   /v1/apps/:name/expose        -> open Cloudflare quick tunnel -> { app } (publicUrl set)
+//   POST   /v1/apps/:name/hide          -> close tunnel -> { app }
 //   GET    /v1/health                   -> { status: 'ok', apps: number, proxyPort: number }
 //
 // The ingress proxy listens on PROXY_PORT (default 8080) and routes by Host

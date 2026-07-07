@@ -8,6 +8,7 @@ import { loadManifest, parseDuration } from './manifest'
 import { createProxy } from './proxy'
 import { createEngine } from './engine'
 import { dashboardHtml } from './dashboard'
+import { openTunnel, closeTunnel } from './tunnel'
 
 const IDLE_REAP_INTERVAL_MS = 30_000
 const LAST_REQUEST_SAVE_THROTTLE_MS = 5_000
@@ -83,6 +84,8 @@ async function main(): Promise<void> {
       createdAt: new Date().toISOString(),
       deployedAt: null,
       error: null,
+      exposed: false,
+      publicUrl: null,
     }
     state.apps[manifest.name] = record
     saveState(state)
@@ -95,11 +98,29 @@ async function main(): Promise<void> {
 
   api.delete('/v1/apps/:name', wrap(async (req, res) => {
     const record = getAppOr404(nameParam(req))
+    closeTunnel(record.name)
     await engine.removeContainer(record)
     deleteSecrets(record.name)
     delete state.apps[record.name]
     saveState(state)
     res.status(204).end()
+  }))
+
+  api.post('/v1/apps/:name/expose', wrap(async (req, res) => {
+    const record = getAppOr404(nameParam(req))
+    record.publicUrl = await openTunnel(record)
+    record.exposed = true
+    saveState(state)
+    res.json({ app: record })
+  }))
+
+  api.post('/v1/apps/:name/hide', wrap(async (req, res) => {
+    const record = getAppOr404(nameParam(req))
+    closeTunnel(record.name)
+    record.exposed = false
+    record.publicUrl = null
+    saveState(state)
+    res.json({ app: record })
   }))
 
   api.post('/v1/apps/:name/deploy', wrap(async (req, res) => {
@@ -229,6 +250,16 @@ async function reconcile(state: ReturnType<typeof loadState>, engine: Engine): P
       app.state = running ? 'running' : app.manifest.type === 'function' ? 'sleeping' : 'stopped'
     } catch (err) {
       console.error(`reconcile: failed to check ${app.name}: ${(err as Error).message}`)
+    }
+    // Re-open tunnels for exposed apps (quick-tunnel URLs change per session)
+    if (app.exposed) {
+      try {
+        app.publicUrl = await openTunnel(app)
+        console.log(`tunnel: ${app.name} -> ${app.publicUrl}`)
+      } catch (err) {
+        app.publicUrl = null
+        console.error(`tunnel: failed to expose ${app.name}: ${(err as Error).message}`)
+      }
     }
   }
 }

@@ -239,7 +239,39 @@ async function main() {
       try {
         const { app } = await client.getApp(name)
         const { proxyPort } = await client.health()
-        return ok({ name, url: appUrl(app, proxyPort) })
+        return ok({ name, url: appUrl(app, proxyPort), publicUrl: app.publicUrl })
+      } catch (err) {
+        return fail(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    'slab_expose',
+    {
+      description: 'Give an app a public HTTPS URL on the internet via a Cloudflare quick tunnel (free, no account). Use when the app must receive webhooks or be reachable from outside this machine. The URL changes each time the tunnel reopens.',
+      inputSchema: { name: z.string().describe('App name') },
+    },
+    async ({ name }) => {
+      try {
+        const { app } = await client.expose(name)
+        return ok({ name, publicUrl: app.publicUrl })
+      } catch (err) {
+        return fail(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    'slab_hide',
+    {
+      description: 'Close an app\'s public tunnel so it is reachable only locally again.',
+      inputSchema: { name: z.string().describe('App name') },
+    },
+    async ({ name }) => {
+      try {
+        await client.hide(name)
+        return ok({ name, hidden: true })
       } catch (err) {
         return fail(err)
       }
