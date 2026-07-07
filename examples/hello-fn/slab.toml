@@ -1,0 +1,6 @@
+# Demo: prebuilt image + lambda-like scale-to-zero
+name = "hello-fn"
+type = "function"
+image = "nginx:alpine"
+port = 80
+idle_timeout = "1m"
