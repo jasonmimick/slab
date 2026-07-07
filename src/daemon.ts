@@ -52,8 +52,15 @@ async function main(): Promise<void> {
   const api = express()
   api.use(express.json())
 
+  // Rolling 60s of request timestamps per app — powers the req/min column
+  const reqTimes = new Map<string, number[]>()
+  function reqPerMin(name: string): number {
+    const now = Date.now()
+    return (reqTimes.get(name) ?? []).filter((t) => now - t < 60_000).length
+  }
+
   api.get('/v1/apps', wrap(async (_req, res) => {
-    res.json({ apps: Object.values(state.apps) })
+    res.json({ apps: Object.values(state.apps).map((a) => ({ ...a, reqPerMin: reqPerMin(a.name) })) })
   }))
 
   api.post('/v1/apps', wrap(async (req, res) => {
@@ -215,6 +222,9 @@ async function main(): Promise<void> {
     if (!app) return
     app.lastRequestAt = new Date().toISOString()
     const now = Date.now()
+    const times = reqTimes.get(name) ?? []
+    times.push(now)
+    reqTimes.set(name, times.filter((t) => now - t < 60_000))
     const last = lastRequestSaveAt.get(name) ?? 0
     if (now - last >= LAST_REQUEST_SAVE_THROTTLE_MS) {
       lastRequestSaveAt.set(name, now)
