@@ -1,0 +1,5 @@
+# The observatory: the rack watching itself
+name = "observatory"
+
+[apps.uptime-kuma]
+source = "./uptime-kuma"

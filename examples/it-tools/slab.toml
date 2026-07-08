@@ -1,0 +1,6 @@
+# dev toolbox
+name = "it-tools"
+type = "function"
+image = "corentinth/it-tools:latest"
+port = 80
+idle_timeout = "15m"

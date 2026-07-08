@@ -1,11 +1,8 @@
-# The fun system: a game wired to a private scoreboard
+# The fun system: real classics, zero build
 name = "arcade"
 
-[apps.snake]
-source = "./snake"
+[apps.mario]
+source = "./mario"
 
-[apps.scores]
-source = "./scores"
-
-[wires]
-"snake.SCORE_URL" = "http://scores:3000"
+[apps.juice]
+source = "./juice"

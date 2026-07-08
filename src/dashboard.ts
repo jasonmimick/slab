@@ -105,27 +105,26 @@ export function dashboardHtml(proxyPort: number): string {
   @keyframes cursor { 50% { opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .cabmark::after { animation: none; } }
 
-  /* ── compiz cube: page <-> workbench ─────────────────────────────── */
+  /* ── flat horizontal rotation: page <-> workbench (no depth, no zoom) ── */
   #cube { position: relative; }
   #face-bench { display: none; background: var(--bg); }
-  body.bench-anim { overflow: hidden; height: 100vh; perspective: 1600px; }
-  body.bench-anim #cube {
-    transform-style: preserve-3d;
-    transition: transform 1.25s cubic-bezier(.45,.05,.2,1);
-    height: 100vh;
-  }
+  body.bench-anim { overflow: hidden; height: 100vh; }
   body.bench-anim #face-rack, body.bench-anim #face-bench {
-    position: absolute; inset: 0; height: 100vh; overflow: hidden;
-    backface-visibility: hidden; display: block;
+    position: absolute; inset: 0; height: 100vh; overflow: hidden; display: block;
+    background: var(--bg);
   }
-  body.bench-anim #face-rack { transform: translateZ(calc(var(--halfw) * -1)) scale(var(--cubescale, 1)); }
-  body.bench-anim #face-rack { transform: rotateY(0deg) translateZ(var(--halfw)); }
-  body.bench-anim #face-bench { transform: rotateY(90deg) translateZ(var(--halfw)); }
-  body.bench-anim #cube { transform: translateZ(calc(var(--halfw) * -1)); }
-  body.bench-anim.bench-turned #cube { transform: translateZ(calc(var(--halfw) * -1)) rotateY(-90deg); }
+  /* NO perspective anywhere: rotateY collapses flat about its own axis —
+     pure horizontal turn, nothing ever moves toward the camera */
+  body.bench-anim #face-rack { transform: rotateY(0deg); transition: transform .62s cubic-bezier(.5,0,.85,.4); }
+  body.bench-anim.p1 #face-rack { transform: rotateY(90deg); }
+  body.bench-anim #face-bench { transform: rotateY(-90deg); transition: transform .62s cubic-bezier(.15,.6,.3,1); }
+  body.bench-anim.p2 #face-bench { transform: rotateY(0deg); }
+  body.bench-anim #face-bench { padding: 24px clamp(16px, 3vw, 48px) 40px 72px; }
   body.bench-static #face-rack { display: none; }
   body.bench-static #face-bench { display: block; position: fixed; inset: 0; overflow: auto; z-index: 40; padding: 24px clamp(16px, 3vw, 48px) 40px 72px; }
-  @media (prefers-reduced-motion: reduce) { body.bench-anim #cube { transition: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    body.bench-anim #face-rack, body.bench-anim #face-bench { transition: none; }
+  }
   .bench-head { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; }
   .bench-head h2 { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); }
   .benchback { background: none; border: 1px solid var(--edge); border-radius: 5px; color: var(--dim);

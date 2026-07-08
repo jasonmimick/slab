@@ -82,27 +82,38 @@ export function createEngine(): Engine {
     }
   }
 
-  async function pullImage(image: string): Promise<void> {
+  async function pullImage(image: string, platform?: string): Promise<void> {
     let stream: NodeJS.ReadableStream
     try {
-      stream = await docker.pull(image)
+      stream = await docker.pull(image, platform ? { platform } : undefined)
     } catch (err) {
       throw new Error(`docker pull failed for ${image}: ${errMsg(err)}`)
     }
-    await new Promise<void>((resolve, reject) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(docker as any).modem.followProgress(
-        stream,
-        (err: unknown, events: Array<{ error?: string; errorDetail?: { message?: string } }>) => {
-          if (err) return reject(new Error(`docker pull failed for ${image}: ${errMsg(err)}`))
-          const failure = events?.find((e) => e && (e.error || e.errorDetail))
-          if (failure) {
-            return reject(new Error(`docker pull failed for ${image}: ${failure.error ?? failure.errorDetail?.message}`))
-          }
-          resolve()
-        },
-      )
-    })
+    try {
+      await new Promise<void>((resolve, reject) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(docker as any).modem.followProgress(
+          stream,
+          (err: unknown, events: Array<{ error?: string; errorDetail?: { message?: string } }>) => {
+            if (err) return reject(new Error(`docker pull failed for ${image}: ${errMsg(err)}`))
+            const failure = events?.find((e) => e && (e.error || e.errorDetail))
+            if (failure) {
+              return reject(new Error(`docker pull failed for ${image}: ${failure.error ?? failure.errorDetail?.message}`))
+            }
+            resolve()
+          },
+        )
+      })
+    } catch (err) {
+      // Old images often ship amd64-only; Apple silicon runs them via Rosetta
+      // if we ask for the platform explicitly. One retry, then give up.
+      const msg = errMsg(err)
+      if (!platform && /manifest|platform|arm64|no match/i.test(msg)) {
+        await pullImage(image, 'linux/amd64')
+        return
+      }
+      throw err
+    }
   }
 
   async function buildImage(app: AppRecord): Promise<string> {

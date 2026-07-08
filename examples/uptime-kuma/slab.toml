@@ -1,0 +1,5 @@
+# status monitor
+name = "uptime-kuma"
+type = "service"
+image = "louislam/uptime-kuma:1"
+port = 3001

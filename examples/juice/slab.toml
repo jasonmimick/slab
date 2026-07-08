@@ -1,0 +1,6 @@
+# OWASP Juice Shop — the hacking game (find the vulns, score points)
+name = "juice"
+type = "function"
+image = "bkimminich/juice-shop"
+port = 3000
+idle_timeout = "15m"

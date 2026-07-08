@@ -1,0 +1,6 @@
+# vs code in the browser
+name = "code-server"
+type = "service"
+image = "codercom/code-server:latest"
+port = 8080
+secrets = ["PASSWORD"]

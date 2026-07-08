@@ -1,0 +1,11 @@
+# The studio: creative + dev tools as slab tenants
+name = "studio"
+
+[apps.excalidraw]
+source = "./excalidraw"
+
+[apps.it-tools]
+source = "./it-tools"
+
+[apps.code-server]
+source = "./code-server"

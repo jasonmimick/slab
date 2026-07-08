@@ -1,0 +1,6 @@
+# super mario js
+name = "mario"
+type = "function"
+image = "pengbai/docker-supermario:latest"
+port = 8080
+idle_timeout = "15m"

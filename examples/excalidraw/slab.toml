@@ -1,0 +1,6 @@
+# collaborative whiteboard
+name = "excalidraw"
+type = "function"
+image = "excalidraw/excalidraw"
+port = 80
+idle_timeout = "15m"
