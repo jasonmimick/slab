@@ -9,6 +9,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&display=swap" rel="stylesheet">
+<script>
+  document.documentElement.dataset.skin = localStorage.getItem('slab-site-skin') || 'stereo'
+</script>
 <style>
   /* palette: the machine room + the pour
      ink #131418 · faceplate #202127→#15161b · amber #ffb454 (power)
@@ -22,7 +25,45 @@
     --con-hi: #cfccc4; --con-md: #9b9890; --con-lo: #6e6b66; --con-ink: #4a473f;
     --disp: 'Big Shoulders Display', 'Arial Narrow', system-ui, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* dark-glass screens (terminals, LCDs, install box) keep these in EVERY skin */
+    --glass: #ece9e2; --glass-dim: #9a9da5; --glass-faint: #5f626a;
   }
+  /* ── skins: the page demos the product's skin system ── */
+  :root[data-skin="hyperscaler"] {
+    --ink: #0a0c10; --rail: #0d1015; --well: #07090c;
+    --text: #dfe4ea; --dim: #98a0ab; --faint: #5c6572;
+    --amber: #4da3ff;
+    --u1: #12151b; --u2: #12151b; --u3: #101318; --u4: #101318;
+    --edge: #232833; --line: #1a1e26; --cheek: transparent;
+  }
+  [data-skin="hyperscaler"] .vents { display: none; }
+  [data-skin="hyperscaler"] .cabinet { box-shadow: 0 0 0 1px var(--edge); margin: 0; border-radius: 6px; }
+  [data-skin="hyperscaler"] .unit, [data-skin="hyperscaler"] .specsheet { box-shadow: none; border-radius: 5px; }
+  [data-skin="hyperscaler"] .pwr::after { box-shadow: none !important; animation: none !important; }
+  [data-skin="hyperscaler"] .lcd { text-shadow: none; }
+  [data-skin="hyperscaler"] .cabmark::after { content: none; }
+  :root[data-skin="phosphor"] {
+    --ink: #030604; --rail: #04120a; --well: #030b06;
+    --text: #b8ffd0; --dim: #59c47f; --faint: #2e7a4c;
+    --amber: #39ff6e; --green: #39ff6e; --blue: #39d0ff;
+    --u1: #051208; --u2: #04100a; --u3: #030b06; --u4: #04100a;
+    --edge: #0e3d22; --line: #0a2a16; --cheek: #0a2a16;
+    --glass: #b8ffd0; --glass-dim: #59c47f; --glass-faint: #2e7a4c;
+  }
+  [data-skin="phosphor"] body { text-shadow: 0 0 4px rgba(57,255,110,.22); }
+  [data-skin="phosphor"] body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); }
+  [data-skin="phosphor"] .hero h1 { color: #8fe8ac; text-shadow: 0 0 18px rgba(57,255,110,.35); }
+  :root[data-skin="daylight"] {
+    --ink: #e9e6df; --rail: #cfccc5; --well: #0b0c0e;
+    --text: #26272d; --dim: #55575e; --faint: #8b8d93;
+    --amber: #c8791b;
+    --u1: #f7f5f0; --u2: #edebe5; --u3: #e0ded7; --u4: #e8e6df;
+    --edge: #bfbcb4; --line: #d9d6cf; --cheek: #b08a5c;
+  }
+  [data-skin="daylight"] .hero h1 { text-shadow: 0 1px 0 #fff, 0 3px 0 #9b9890, 0 5px 0 #7a776f, 0 8px 18px rgba(0,0,0,.25); }
+  [data-skin="daylight"] .lcd { color: #ffb454; }
+  [data-skin="daylight"] .cabmark { color: #a3651a; }
   * { box-sizing: border-box; margin: 0; }
   html { scroll-behavior: smooth; }
   body { font: 14px/1.6 var(--mono); background: var(--ink); color: var(--text); }
@@ -36,9 +77,16 @@
     border-bottom: 1px solid var(--line); }
   nav .mark { display: flex; align-items: center; gap: 10px; color: var(--text); }
   nav .mark b { font-family: var(--disp); font-weight: 800; font-size: 20px; letter-spacing: .04em; }
-  nav .links { margin-left: auto; display: flex; gap: 20px; font-size: 12px; }
+  nav .links { display: flex; gap: 20px; font-size: 12px; margin-left: 22px; }
   nav .links a { color: var(--dim); }
   nav .links a:hover { color: var(--amber); text-decoration: none; }
+  .skins { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .skins .lbl { color: var(--faint); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; margin-right: 4px; }
+  .skins button { font: inherit; font-size: 10px; letter-spacing: .05em; background: none;
+    border: 1px solid var(--line); border-radius: 4px; color: var(--faint); padding: 3px 9px; cursor: pointer; }
+  .skins button:hover { color: var(--amber); border-color: var(--amber); }
+  .skins button.on { color: var(--amber); border-color: var(--amber); }
+  @media (max-width: 700px) { nav { flex-wrap: wrap; } .skins { flex-basis: 100%; margin-left: 0; } }
 
   /* ── hero: thesis left, a living cabinet right ── */
   .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
@@ -53,7 +101,7 @@
   .install { display: flex; margin-top: 26px; background: var(--well);
     border: 1px solid var(--edge); border-radius: 7px; overflow: hidden;
     box-shadow: inset 0 1px 6px rgba(0,0,0,.6); }
-  .install code { flex: 1; padding: 12px 14px; font-size: 12px; white-space: nowrap; overflow-x: auto; }
+  .install code { flex: 1; padding: 12px 14px; font-size: 12px; white-space: nowrap; overflow-x: auto; color: var(--glass); }
   .install button { font: inherit; font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
     background: rgba(255,180,84,.08); color: var(--amber); border: none; border-left: 1px solid var(--edge);
     padding: 0 16px; cursor: pointer; }
@@ -122,8 +170,8 @@
   .verbrack .unit { grid-template-columns: 24px 22px minmax(180px, 5fr) minmax(0, 7fr); align-items: center; }
   .verbrack .name b { color: var(--amber); }
   .verbrack pre { background: var(--well); border: 1px solid var(--line); border-radius: 5px;
-    padding: 10px 13px; font-size: 11.5px; line-height: 1.7; overflow-x: auto; margin: 0; }
-  .verbrack pre i { color: var(--faint); font-style: normal; }
+    padding: 10px 13px; font-size: 11.5px; line-height: 1.7; overflow-x: auto; margin: 0; color: var(--glass); }
+  .verbrack pre i { color: var(--glass-faint); font-style: normal; }
   .verbrack pre b { color: var(--green); font-weight: 400; }
   @media (max-width: 760px) { .verbrack .unit { grid-template-columns: 24px 22px 1fr; }
     .verbrack pre { grid-column: 1 / -1; } }
@@ -178,12 +226,12 @@
   .term .bar i { width: 9px; height: 9px; border-radius: 50%; background: #2b2d34; }
   .term .bar i:first-child { background: var(--red); opacity: .7; }
   .term .bar span { margin-left: auto; color: var(--faint); font-size: 10px; letter-spacing: .14em; }
-  .term pre { padding: 16px 18px; font-size: 11.5px; line-height: 1.85; overflow-x: auto; margin: 0; }
-  .term .p { color: var(--faint); }
-  .term .t { color: var(--blue); }
-  .term .o { color: var(--dim); }
-  .term .g { color: var(--green); }
-  .term .a { color: var(--amber); }
+  .term pre { padding: 16px 18px; font-size: 11.5px; line-height: 1.85; overflow-x: auto; margin: 0; color: var(--glass); }
+  .term .p { color: var(--glass-faint); }
+  .term .t { color: #82b8e8; }
+  .term .o { color: var(--glass-dim); }
+  .term .g { color: #71d68d; }
+  .term .a { color: #ffb454; }
   @media (max-width: 820px) { .agents { grid-template-columns: 1fr; } }
 
   footer { margin-top: clamp(56px, 8vw, 90px); border-top: 1px solid var(--line);
@@ -216,6 +264,13 @@
     <a href="https://github.com/jasonmimick/slab/blob/master/docs/getting-started.md">get started</a>
     <a href="https://github.com/jasonmimick/slab/tree/master/docs">docs</a>
     <a href="https://github.com/jasonmimick/slab">github</a>
+  </span>
+  <span class="skins" role="group" aria-label="page skin — the dashboard is skinnable the same way">
+    <span class="lbl">skin</span>
+    <button data-s="stereo" onclick="setSkin('stereo')">stereo</button>
+    <button data-s="hyperscaler" onclick="setSkin('hyperscaler')">hyperscaler</button>
+    <button data-s="phosphor" onclick="setSkin('phosphor')">phosphor</button>
+    <button data-s="daylight" onclick="setSkin('daylight')">daylight</button>
   </span>
 </nav>
 
@@ -267,7 +322,8 @@
       <div class="cabmark">arcade<span class="chinfo">waffle slab · 3 members · 2 wires</span></div>
     </div>
     <p class="cabcap">this is the dashboard's actual language — every app a rack unit,
-    flip one open for its board · <a href="https://github.com/jasonmimick/slab/blob/master/docs/skins.md">skinnable</a></p>
+    flip one open for its board · <a href="https://github.com/jasonmimick/slab/blob/master/docs/skins.md">skinnable</a>
+    — this page too, try the switcher ↑</p>
   </div>
 </header>
 
@@ -376,6 +432,16 @@
 
 </div>
 <script>
+function setSkin(name) {
+  document.documentElement.dataset.skin = name
+  localStorage.setItem('slab-site-skin', name)
+  markSkin()
+}
+function markSkin() {
+  const cur = document.documentElement.dataset.skin || 'stereo'
+  document.querySelectorAll('.skins button').forEach(b => b.classList.toggle('on', b.dataset.s === cur))
+}
+markSkin()
 function copyCmd(btn) {
   const text = document.getElementById('cmd').textContent
   const done = () => { btn.textContent = 'copied'; setTimeout(() => { btn.textContent = 'copy' }, 1100) }
