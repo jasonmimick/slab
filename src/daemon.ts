@@ -9,7 +9,7 @@ import { loadState, saveState, allocateHostPort, getSecrets, setSecrets, deleteS
 import { loadManifest, loadSystemManifest, parseDuration } from './manifest'
 import { createProxy } from './proxy'
 import { createEngine } from './engine'
-import { dashboardHtml, apiHumanHtml } from './dashboard'
+import { dashboardHtml, apiHumanHtml, faviconSvg } from './dashboard'
 import { openTunnel, closeTunnel } from './tunnel'
 import { cloneOrPull, normalizeGitUrl, repoDirName, looksLikeGitUrl } from './git'
 
@@ -696,6 +696,12 @@ async function main(): Promise<void> {
   api.get('/', (_req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     res.send(dashboardHtml(PROXY_PORT))
+  })
+
+  api.get('/favicon.svg', (_req, res) => {
+    res.setHeader('Content-Type', 'image/svg+xml')
+    res.setHeader('Cache-Control', 'public, max-age=86400')
+    res.send(faviconSvg)
   })
 
   // ── skins: user-built dashboard themes ────────────────────────────────────

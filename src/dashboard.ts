@@ -1,5 +1,16 @@
 // Control-plane UI, served by the daemon at GET / (port 7766).
 // Zero build step, zero deps, system fonts only.
+
+// The mark reduced to what survives 16px: three faces + the LED.
+// Canonical source: assets/favicon.svg — embedded here so dist/ is self-contained.
+export const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="slab">
+  <polygon points="16,4 30,11 16,18 2,11" fill="#d6d3cb"/>
+  <polygon points="2,11 16,18 16,28 2,21" fill="#98958d"/>
+  <polygon points="30,11 16,18 16,28 30,21" fill="#68655e"/>
+  <circle cx="24.5" cy="18.5" r="3.4" fill="#ffb454" opacity="0.35"/>
+  <circle cx="24.5" cy="18.5" r="1.9" fill="#ffb454"/>
+</svg>
+`
 // Design: apps are "slabs" — machined rack units. Click a unit's faceplate to
 // flip it open (CSS 3D) and see the board inside: chips, wiring, source, secrets.
 
@@ -9,6 +20,7 @@ export function dashboardHtml(proxyPort: number): string {
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>slab</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script>
   // theme + skin init before first paint (no flash): saved choice, else OS preference
   document.documentElement.dataset.theme =
@@ -1461,6 +1473,7 @@ export function apiHumanHtml(path: string, data: unknown): string {
     ['PUT', '/v1/node', '{ name } — rename this node'],
   ]
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>slab api — ${path}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script>
   document.documentElement.dataset.theme =
     localStorage.getItem('slab-theme') ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
