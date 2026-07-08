@@ -12,6 +12,8 @@ dashboard, or AI agents speaking MCP.
 
 *one machine · one daemon · zero cloud accounts*
 
+**[jasonmimick.github.io/slab](https://jasonmimick.github.io/slab/)** · [docs](docs/README.md) · [install](#install)
+
 </div>
 
 ```text
