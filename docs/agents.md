@@ -33,8 +33,8 @@ default `127.0.0.1:7766`.
 
 ## tool list
 
-Twelve tools, all named `slab_*`, all returning JSON (either the result or
-an error string with `isError: true`):
+All named `slab_*`, all returning JSON (either the result or an error
+string with `isError: true`):
 
 | tool | description |
 |---|---|
@@ -51,6 +51,10 @@ an error string with `isError: true`):
 | `slab_url` | Get the public URL an app is reachable at through the slab ingress proxy. Use this after a deploy to know where to send requests. |
 | `slab_expose` | Give an app a public HTTPS URL on the internet via a Cloudflare quick tunnel (free, no account). Use when the app must receive webhooks or be reachable from outside this machine. The URL changes each time the tunnel reopens. |
 | `slab_hide` | Close an app's public tunnel so it is reachable only locally again. |
+| `slab_run` | Run a job to completion in an isolated container and return exit code + logs in one blocking call. Dockerfile mode or stock `image` with the source mounted at `/workspace`. The `systems` param joins the job to system networks — the sandbox for working ON a system. |
+| `slab_jobs` | List jobs (state, exit code, command, timings), newest first. |
+| `slab_system_deploy` | Create/update + deploy a system from a `sourceFile` **or an inline `manifest`** — agents never need to write files. Members deploy in dependency order; placed members go to their nodes; trunks start automatically. |
+| `slab_system_list` | List systems: members, wires, last deploy. |
 
 ## a realistic workflow
 
@@ -74,6 +78,27 @@ An agent asked to stand up a webhook receiver from a git repo might do:
 
 Every step above returns structured JSON an agent can branch on
 (`state`, `error`, `publicUrl`) rather than text an agent has to parse.
+
+## working ON a system — the sandbox pattern
+
+"Fix the ssl bug in system `arcade`" decomposes into primitives that all
+exist today:
+
+1. **`slab_system_list`** — find `arcade`: members, wires, which member is
+   private, where each lives (`memberNodes`).
+2. **`slab_run`** with `{ "systems": ["arcade"], "image": "alpine:3",
+   "command": ["wget", "-qO-", "http://scoreboard:4000/health"] }` — probe
+   the real member over the real wiring. `systems` puts the job container
+   ON the system's private network (trunks carry it across nodes), so even
+   `public = false` members answer by name. Exit code + logs come back in
+   the same call.
+3. Each member's app record carries its `gitUrl` — clone, patch, push.
+4. **`slab_deploy`** (or `slab_system_deploy`) to roll the fix out, then
+   re-probe with another `slab_run`.
+
+Guardrails an agent inherits for free: job timeouts (default 30m), bounded
+job history, and wire changes via `PUT /v1/systems/:name/wires` that
+auto-redeploy affected members.
 
 ## design principle
 

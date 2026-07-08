@@ -116,8 +116,10 @@ must make running things legible, bounded, and reversible.
 - **Named nodes.** Every daemon has an identity (`slab node`) — groundwork
   for multi-node.
 
-More detail:
-- [docs/getting-started.md](docs/getting-started.md) — full walkthrough
+More detail — full index at [docs/](docs/README.md):
+- [docs/getting-started.md](docs/getting-started.md) — install → deploy → everything
+- [docs/jobs.md](docs/jobs.md) — `slab run`: tests, builds, sandbox/agent jobs
+- [docs/cluster.md](docs/cluster.md) — nodes, peers, `--node`, the solar system
 - [docs/manifest.md](docs/manifest.md) — complete `slab.toml` reference
 - [docs/agents.md](docs/agents.md) — the MCP tool surface for agents
 - [docs/api.md](docs/api.md) — the daemon HTTP API

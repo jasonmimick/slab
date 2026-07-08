@@ -132,6 +132,81 @@ Close the tunnel.
   `exposed: false`.
 - Errors: `404` if unknown.
 
+## systems
+
+Apps wired together on a private network — see
+[design/systems.md](design/systems.md) and, for spanning nodes,
+[design/trunks.md](design/trunks.md).
+
+### `GET /v1/systems`
+
+- Response `200`: `{ "systems": SystemRecord[] }` — each carries a computed
+  `editable` (true when the manifest is daemon-owned, i.e. created via the
+  inline API, and not adopted from a peer).
+
+### `POST /v1/systems`
+
+Create or update a system.
+
+- Body: `{ "sourceFile": "<abs path to system.toml>" }` **or**
+  `{ "manifest": { name, apps: { <member>: { source, node? } }, wires } }` —
+  the inline form (dashboard/agents) is validated identically and persisted
+  to `~/.slab/systems/<name>.toml`. Unknown member apps are auto-created
+  from their sources; members with `node` are created on that peer at
+  deploy time.
+- Response `201` (new) / `200` (update): `{ "system": SystemRecord }`.
+
+### `POST /v1/systems/:name/deploy`
+
+Deploy every member in wire-dependency order: local members here, placed
+members pushed to their peers (adopt), then trunks started on every
+involved node. Distinct member ports are enforced for spanning systems.
+
+- Response `200`: `{ "system": SystemRecord, "apps": AppRecord[] }` (local
+  members only in `apps`).
+
+### `PUT /v1/systems/:name/wires`
+
+Patch wires; affected local members are redeployed automatically.
+
+- Body: `{ "set"?: { "<member>.<ENV>": value }, "remove"?: [key] }`.
+- Response `200`: `{ "system", "redeployed": string[] }`.
+- Errors: `409` if the system's manifest isn't daemon-owned (edit the file
+  and `slab up`) or is adopted from a peer (edit on the console node);
+  `400` on invalid keys.
+
+### `DELETE /v1/systems/:name`
+
+Removes this node's trunk, the network, and the record. Member apps are
+**never** deleted.
+
+- Response: `204`.
+
+### node-to-node (used by the daemon itself)
+
+`POST /v1/systems/adopt` and `POST /v1/systems/:name/trunk-sync` — a
+console pushes a spanning system to a peer and synchronizes trunk configs.
+Not intended for direct use.
+
+## cluster
+
+### `GET /v1/fleet`
+
+This node + every registered peer, one payload (parallel fan-out, 3s bound
+per peer; a dead peer degrades to `reachable: false`, never fails the
+view).
+
+- Response `200`: `{ "nodes": [{ name, self, reachable, url, proxyPort,
+  apps, systems, error }] }`.
+
+### `GET /v1/peers` · `PUT /v1/peers/:name` · `DELETE /v1/peers/:name`
+
+The peer registry. `PUT` body: `{ "url": "http://host:7766", "token"? }`.
+
+### `PUT /v1/node`
+
+Rename this node. Body: `{ "name" }` (same rules as app names).
+
 ## jobs
 
 Run-to-completion workloads (`slab run`): build (or pull) an image, run one
@@ -158,9 +233,12 @@ immediately with the record in state `"queued"`; poll `GET /v1/jobs/:id`
 for progress (`queued → building → running → succeeded|failed|canceled`).
 
 - Body: `{ "sourceDir"?, "gitUrl"?, "image"?, "command"?: string[],
-  "env"?: Record<string,string>, "name"?, "timeout"? }` — at least one of
-  `sourceDir`/`gitUrl`/`image`. `timeout` is `"90s" | "10m" | "1h"`-style,
-  default `30m`; the daemon kills the container when it expires.
+  "env"?: Record<string,string>, "name"?, "timeout"?, "systems"?: string[] }`
+  — at least one of `sourceDir`/`gitUrl`/`image`. `timeout` is
+  `"90s" | "10m" | "1h"`-style, default `30m`; the daemon kills the
+  container when it expires. `systems` joins the job to those systems'
+  networks before start — it reaches members (including private ones) by
+  name; see [jobs.md](jobs.md#jobs-inside-systems--the-sandbox-agent-primitive).
 - Response `201`: `{ "job": JobRecord }`.
 - Errors: `400` on a malformed body, an unresolvable source, a missing
   Dockerfile (without `image`), or a bare `image` job with no `command`.
@@ -206,6 +284,16 @@ naming it is the identity groundwork for running several slabs.
   (`^[a-z][a-z0-9-]{1,30}$`).
 - Response `200`: `{ "node": string }`.
 - Errors: `400` on an invalid name.
+
+## misc
+
+- `GET /v1/events` — server-sent events (`request`, `deploy`, `job`); the
+  dashboard's live audio/visuals listen here.
+- `POST /v1/play` — body `{ "seconds"? }`: rhythmic health checks across
+  running apps (every note is a real request).
+- `GET /v1/skins` · `GET /skins/<name>.css` — dashboard skins
+  ([skins.md](skins.md)).
+- `GET /` — the dashboard. `GET /favicon.svg` — the mark.
 
 ## unmapped routes
 
