@@ -7,6 +7,8 @@ export type AppState = 'created' | 'building' | 'running' | 'sleeping' | 'stoppe
 export interface Manifest {
   name: string
   type: AppType
+  target?: string           // where the app runs: "docker" (default, this node's
+                            // engine) or a provider name like "aws" (docs/design/providers.md)
   port: number              // port the app listens on INSIDE the container
   public?: boolean          // default true. false -> no host port, no ingress:
                             // reachable ONLY by system-mates (docs/design/systems.md)
@@ -26,6 +28,9 @@ export interface AppRecord {
   manifest: Manifest
   hostPort: number | null   // allocated host port (20000+), null until first deploy
   containerId: string | null
+  target?: string           // provider name; absent/"docker" = local engine
+  ref?: string | null       // provider handle (e.g. ECS service arn) — opaque to slab
+  endpoint?: string | null  // host:port the ingress dials for provider apps
   imageTag: string | null   // slab/<name>:<version>
   version: number           // increments per deploy
   state: AppState

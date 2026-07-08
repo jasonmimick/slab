@@ -157,20 +157,37 @@ program
 program
   .command('deploy [source]')
   .description('deploy an app (builds + starts) from a dir, git url, or app name')
-  .action(action(async (dirOrName?: string) => {
+  .option('--target <name>', 'run the app on a provider instead of local docker (e.g. aws); applies when the app is first created')
+  .action(action(async (dirOrName: string | undefined, opts: { target?: string }) => {
     const arg = dirOrName ?? process.cwd()
     const asDir = path.resolve(arg)
     let name: string
     if (looksLikeGitUrl(arg) && !isDir(asDir)) {
-      const { app } = await api.createApp({ gitUrl: arg }).catch(async (e: Error) => {
+      const { app } = await api.createApp({ gitUrl: arg, target: opts.target }).catch(async (e: Error) => {
         // 409 = already registered; find it by checkout name convention
         if (!/exists/.test(e.message)) throw e
         const m = /app "([^"]+)"/.exec(e.message)
         return api.getApp(m ? m[1] : arg)
       })
       name = app.name
+    } else if (isDir(asDir)) {
+      const manifest = loadManifest(asDir)
+      try {
+        await api.getApp(manifest.name)
+      } catch {
+        await api.createApp({ sourceDir: asDir, target: opts.target })
+      }
+      name = manifest.name
     } else {
-      name = isDir(asDir) ? await ensureApp(asDir) : arg
+      name = arg
+    }
+    // --target only applies at creation — refuse silently deploying elsewhere
+    if (opts.target) {
+      const { app } = await api.getApp(name)
+      const current = app.target ?? 'docker'
+      if (current !== opts.target) {
+        throw new Error(`"${name}" already exists with target "${current}" — remove it first (slab rm ${name}) or set target = "${opts.target}" in its slab.toml`)
+      }
     }
     const { app } = await api.deploy(name)
     if (app.state === 'running') {

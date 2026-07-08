@@ -951,6 +951,7 @@ function bayHtml(a, i) {
     + '<div class="plate" onclick="toggle()" title="flip all boards">'
     +   '<div class="name">' + esc(a.name) + '<small>' + a.state + '</small><span class="hint">▸ flip</span></div>'
     +   '<div class="spec"><b>' + a.manifest.type + '</b> · ' + (a.manifest.image ? esc(a.manifest.image) : 'dockerfile')
+    +     (a.target && a.target !== 'docker' ? ' · <b style="color:var(--amber)">@ ' + esc(a.target) + '</b>' : '')
     +     (a.manifest.postgres ? ' · <b>postgres</b>' : '') + ' · v' + a.version + ' · deployed ' + rel(a.deployedAt) + '</div>'
     +   '<div class="routes" onclick="event.stopPropagation()">'
     +     (priv

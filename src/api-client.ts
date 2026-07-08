@@ -38,7 +38,7 @@ export function clientFor(base: string, token?: string, timeoutMs?: number) {
     health: () => req<{ status: string; node?: string; apps: number; proxyPort: number }>('GET', '/v1/health'),
     setNode: (name: string) => req<{ node: string }>('PUT', '/v1/node', { name }),
     listApps: () => req<{ apps: AppRecord[] }>('GET', '/v1/apps'),
-    createApp: (source: { sourceDir?: string; gitUrl?: string }) => req<{ app: AppRecord }>('POST', '/v1/apps', source),
+    createApp: (source: { sourceDir?: string; gitUrl?: string; target?: string }) => req<{ app: AppRecord }>('POST', '/v1/apps', source),
     getApp: (name: string) => req<{ app: AppRecord }>('GET', `/v1/apps/${name}`),
     removeApp: (name: string) => req<void>('DELETE', `/v1/apps/${name}`),
     deploy: (name: string) => req<{ app: AppRecord }>('POST', `/v1/apps/${name}/deploy`),

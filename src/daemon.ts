@@ -14,6 +14,10 @@ import { openTunnel, closeTunnel } from './tunnel'
 import { cloneOrPull, normalizeGitUrl, repoDirName, looksLikeGitUrl } from './git'
 import { clientFor } from './api-client'
 import { trunkScript, TRUNK_INGRESS_PORT } from './trunk'
+import { getProvider, isProviderTarget, registerProvider } from './providers/provider'
+import { createAwsProvider } from './providers/aws'
+
+registerProvider('aws', createAwsProvider)
 
 const IDLE_REAP_INTERVAL_MS = 30_000
 const LAST_REQUEST_SAVE_THROTTLE_MS = 5_000
@@ -188,7 +192,7 @@ async function main(): Promise<void> {
   // Shared app-creation logic used by POST /v1/apps and system member
   // auto-create (POST /v1/systems). expectedName, when set, is the system
   // manifest's member key — it must match the app's own slab.toml name.
-  async function createAppFromSource(source: string, baseDir: string, expectedName?: string): Promise<AppRecord> {
+  async function createAppFromSource(source: string, baseDir: string, expectedName?: string, targetOverride?: string): Promise<AppRecord> {
     const { sourceDir, gitUrl } = await resolveSource(source, baseDir)
     let manifest: Manifest
     try {
@@ -210,6 +214,9 @@ async function main(): Promise<void> {
       manifest,
       hostPort,
       containerId: null,
+      target: targetOverride ?? manifest.target ?? undefined,
+      ref: null,
+      endpoint: null,
       imageTag: null,
       version: 0,
       state: 'created',
@@ -239,6 +246,39 @@ async function main(): Promise<void> {
         // manifest may have changed upstream — re-read it
         record.manifest = loadManifest(record.sourceDir)
       }
+
+      // ── provider targets: build locally, push, hand off to the substrate ──
+      const target = record.target ?? record.manifest.target
+      if (isProviderTarget(target)) {
+        const provider = getProvider(target!)
+        await provider.ready()
+        if (record.manifest.postgres && !provider.capabilities.postgres) {
+          throw new Error(`postgres = true isn't supported on target "${target}" yet — use a managed database and wire it via secrets`)
+        }
+        if (systemsOf(record.name).length && !provider.capabilities.systems) {
+          throw new Error(`apps targeting "${target}" can't join systems yet`)
+        }
+        if (record.manifest.type === 'function' && !provider.capabilities.functions) {
+          console.warn(`"${record.name}": functions aren't supported on ${target} — running as an always-on service`)
+        }
+        const localTag = await engine.buildImage(record)
+        const env = { ...record.manifest.env, ...getSecrets(record.name) }
+        const image = await provider.prepareImage(record, localTag)
+        const { ref, endpoint } = await provider.deploy(record, image, env)
+        record.target = target
+        record.ref = ref
+        record.endpoint = endpoint
+        record.imageTag = image
+        record.containerId = null
+        record.version += 1
+        record.state = 'running'
+        record.deployedAt = new Date().toISOString()
+        record.error = null
+        broadcast({ type: 'deploy', app: record.name })
+        saveState(state)
+        return
+      }
+
       const imageTag = await engine.buildImage(record)
 
       const memberSystems = systemsOf(record.name)
@@ -479,15 +519,17 @@ async function main(): Promise<void> {
   api.post('/v1/apps', wrap(async (req, res) => {
     const gitUrlInput = req.body?.gitUrl
     const sourceDirInput = req.body?.sourceDir
+    const targetInput = typeof req.body?.target === 'string' && req.body.target ? req.body.target : undefined
     let source: string
     if (typeof gitUrlInput === 'string' && gitUrlInput) {
       source = gitUrlInput
     } else if (typeof sourceDirInput === 'string' && path.isAbsolute(sourceDirInput)) {
       source = sourceDirInput
     } else {
-      throw new HttpError(400, 'body must be { sourceDir: <absolute path> } or { gitUrl }')
+      throw new HttpError(400, 'body must be { sourceDir: <absolute path> } or { gitUrl } (+ optional target)')
     }
-    const record = await createAppFromSource(source, process.cwd())
+    if (targetInput && isProviderTarget(targetInput)) getProvider(targetInput)   // 400s early on unknown targets
+    const record = await createAppFromSource(source, process.cwd(), undefined, targetInput)
     res.status(201).json({ app: record })
   }))
 
@@ -498,7 +540,8 @@ async function main(): Promise<void> {
   api.delete('/v1/apps/:name', wrap(async (req, res) => {
     const record = getAppOr404(nameParam(req))
     closeTunnel(record.name)
-    await engine.removeContainer(record)
+    if (isProviderTarget(record.target)) await getProvider(record.target!).remove(record)
+    else await engine.removeContainer(record)
     deleteSecrets(record.name)
     delete state.apps[record.name]
     saveState(state)
@@ -534,7 +577,8 @@ async function main(): Promise<void> {
 
   api.post('/v1/apps/:name/stop', wrap(async (req, res) => {
     const record = getAppOr404(nameParam(req))
-    await engine.stopContainer(record)
+    if (isProviderTarget(record.target)) await getProvider(record.target!).stop(record)
+    else await engine.stopContainer(record)
     record.state = 'stopped'
     saveState(state)
     res.json({ app: record })
@@ -542,7 +586,12 @@ async function main(): Promise<void> {
 
   api.post('/v1/apps/:name/start', wrap(async (req, res) => {
     const record = getAppOr404(nameParam(req))
-    await engine.startContainer(record)
+    if (isProviderTarget(record.target)) {
+      const { endpoint } = await getProvider(record.target!).start(record)
+      record.endpoint = endpoint
+    } else {
+      await engine.startContainer(record)
+    }
     record.state = 'running'
     saveState(state)
     res.json({ app: record })
@@ -551,7 +600,9 @@ async function main(): Promise<void> {
   api.get('/v1/apps/:name/logs', wrap(async (req, res) => {
     const record = getAppOr404(nameParam(req))
     const tail = parseTail(req.query.tail)
-    const logs = await engine.getLogs(record, tail)
+    const logs = isProviderTarget(record.target)
+      ? await getProvider(record.target!).logs(record, tail)
+      : await engine.getLogs(record, tail)
     res.json({ logs })
   }))
 
@@ -1228,6 +1279,17 @@ function parseTail(raw: unknown): number {
 // state left over from a previous daemon run (e.g. after a crash/reboot).
 async function reconcile(state: ReturnType<typeof loadState>, engine: Engine): Promise<void> {
   for (const app of Object.values(state.apps)) {
+    // provider apps: ask the substrate, refresh the endpoint (task IPs rotate)
+    if (isProviderTarget(app.target)) {
+      try {
+        const s = await getProvider(app.target!).status(app)
+        if (s.state !== 'unknown') app.state = s.state
+        if (s.endpoint !== undefined) app.endpoint = s.endpoint
+      } catch (err) {
+        console.error(`reconcile: ${app.name} (${app.target}): ${(err as Error).message}`)
+      }
+      continue
+    }
     if (!app.containerId) continue
     try {
       const running = await engine.isRunning(app)
@@ -1275,6 +1337,7 @@ async function reconcileSystems(state: ReturnType<typeof loadState>, engine: Eng
 function startIdleReaper(state: ReturnType<typeof loadState>, engine: Engine): void {
   setInterval(() => {
     for (const app of Object.values(state.apps)) {
+      if (isProviderTarget(app.target)) continue   // no scale-to-zero on providers (v1)
       if (app.manifest.type !== 'function') continue
       if (app.state !== 'running') continue
       if (!app.lastRequestAt) continue

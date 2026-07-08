@@ -138,6 +138,22 @@ a waffle slab where one node's "bridge" is a Cloud Map namespace. The trunk
 already speaks plain TCP with a token preamble; the AWS side runs it as one
 more Fargate task. Not v1, but nothing in the design blocks it.
 
+### auth: the user's account, the node's identity
+
+slab holds no cloud credentials, ever. The v1 aws provider shells out to
+the operator's own `aws` CLI, so calls run as whatever identity already
+exists — `aws configure` keys, an SSO profile, env vars, or (the best
+case) the **IAM instance role of an EC2-hosted slab node**: the standard
+credential chain resolves it automatically, zero keys stored anywhere.
+`~/.slab/providers.toml` names a profile/region at most.
+
+**Roadmap: native SDK implementation.** Replace CLI shell-outs with AWS
+SDK calls — same Provider surface, no `aws` binary dependency, faster
+(no process spawn per call), and the node's IAM role remains the intended
+credential source. The docs ship a least-privilege policy for the role
+(ECS/ECR/CloudWatch Logs/EC2-describe/IAM-passrole on slab-prefixed
+resources).
+
 ## plugin packaging — three phases
 
 1. **Now (in-tree):** providers are TS modules in `src/providers/<name>.ts`

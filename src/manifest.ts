@@ -29,6 +29,7 @@ export function loadManifest(sourceDir: string): Manifest {
   return {
     name,
     type,
+    target: raw.target != null ? String(raw.target) : undefined,
     port,
     public: raw.public !== false,
     image,

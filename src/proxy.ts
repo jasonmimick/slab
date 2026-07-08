@@ -83,6 +83,22 @@ export function createProxy(deps: ProxyDeps): http.Server {
       sendJson(res, 403, { error: 'app is private — reachable only inside its systems' })
       return
     }
+
+    // provider apps: the ingress dials the substrate's endpoint directly —
+    // app.localhost:8080 fronts a Fargate task the same way it fronts a container
+    const providerApp = !!app.target && app.target !== 'docker'
+    if (providerApp) {
+      if (!app.endpoint) {
+        sendJson(res, 503, { error: `app runs on ${app.target} but has no endpoint yet — redeploy or wait for the task to start` })
+        return
+      }
+      onRequest(name)
+      proxy.web(req, res, { target: `http://${app.endpoint}` }, (err) => {
+        if (!res.headersSent) sendJson(res, 502, { error: `proxy error (${app.target}): ${err.message}` })
+      })
+      return
+    }
+
     if (app.hostPort == null) {
       sendJson(res, 503, { error: 'app has never been deployed' })
       return
