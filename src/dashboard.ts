@@ -60,10 +60,36 @@ export function dashboardHtml(proxyPort: number): string {
   .spine .vent { height: 46px; border-radius: 6px; border: 1px solid var(--groove);
     background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.5) 3px 5px); opacity: .5; }
 
+  /* cabinet: matte monolith with scattered vent perforations (oxide-style) */
+  .cabinet {
+    background: linear-gradient(180deg, #101114, #0c0d10);
+    border: 1px solid var(--groove); border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
+    overflow: hidden;
+  }
+  .vents {
+    height: 64px; margin: 14px 18px 4px;
+    background:
+      repeating-linear-gradient(90deg, #030304 0 7px, transparent 7px 13px),
+      repeating-linear-gradient(0deg, #030304 0 11px, transparent 11px 16px);
+    background-blend-mode: lighten;
+    -webkit-mask-image: linear-gradient(105deg, transparent 0 8%, #000 30% 55%, transparent 78%), linear-gradient(180deg, #000 0 55%, transparent);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(105deg, transparent 0 8%, #000 30% 55%, transparent 78%), linear-gradient(180deg, #000 0 55%, transparent);
+    mask-composite: intersect;
+    opacity: .9;
+  }
   .rack {
-    background: var(--rail); border: 1px solid var(--groove); border-radius: 10px;
+    background: var(--rail); border-top: 1px solid var(--groove);
     padding: 10px; box-shadow: inset 0 2px 10px rgba(0,0,0,.6);
   }
+  .cabmark {
+    padding: 10px 18px 12px; font-size: 13px; letter-spacing: .06em;
+    color: var(--amber); opacity: .85; user-select: none;
+  }
+  .cabmark::after { content: '_'; animation: cursor 1.2s steps(1) infinite; }
+  @keyframes cursor { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .cabmark::after { animation: none; } }
 
   /* ── 3D flip machinery ─────────────────────────────────────────────── */
   .bay { perspective: 1400px; margin-bottom: 10px; }
@@ -79,9 +105,21 @@ export function dashboardHtml(proxyPort: number): string {
     display: grid; grid-template-columns: 18px 1fr auto auto; gap: 20px; align-items: center;
     background: linear-gradient(180deg, var(--unit-hi), var(--unit-lo));
     border: 1px solid var(--edge); border-radius: 7px;
-    padding: 18px 22px 18px 40px; position: relative; height: 100%;
+    padding: 18px 22px 18px 62px; position: relative; height: 100%;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 4px 10px rgba(0,0,0,.35);
   }
+  /* sled edge: PCB strip with activity LEDs (lit count tracks req/min) */
+  .sled {
+    position: absolute; left: 30px; top: 8px; bottom: 8px; width: 16px;
+    background: linear-gradient(180deg, #1c2b20, #14211a);
+    border: 1px solid #2a3d2f; border-radius: 3px;
+    display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
+  }
+  .sled i {
+    width: 5px; height: 5px; border-radius: 1px; background: #223228;
+  }
+  .sled i.on { background: #f2f6ef; box-shadow: 0 0 5px rgba(242,246,239,.9), 0 0 12px rgba(242,246,239,.35); }
+  .sleeping .sled i.on, .stopped .sled i.on, .created .sled i.on { background: #5a6a5e; box-shadow: none; }
   .bay:not(.open):hover .unit { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 18px rgba(0,0,0,.45); }
   .unit::before, .unit::after {
     content: ''; position: absolute; width: 5px; height: 5px; border-radius: 50%;
@@ -208,7 +246,11 @@ export function dashboardHtml(proxyPort: number): string {
     <span data-nav="boards — flip all" onclick="navBoards()">B</span>
     <div class="vent"></div><div class="vent"></div>
   </div>
-  <div class="rack" id="rack"></div>
+  <div class="cabinet">
+    <div class="vents"></div>
+    <div class="rack" id="rack"></div>
+    <div class="cabmark">slab</div>
+  </div>
 </div>
 <footer>
   <span>ingress :${proxyPort} · api :7766</span>
@@ -285,10 +327,13 @@ function render() {
     const url = 'http://' + a.name + '.localhost:${proxyPort}'
     const rpm = a.reqPerMin ?? 0
     const open = openBays.has(a.name)
+    const lit = a.state === 'running' ? Math.min(8, 1 + Math.ceil(Math.log2(rpm + 1))) : 1
+    const sled = Array.from({ length: 8 }, (_, k) => '<i class="' + (k < lit ? 'on' : '') + '"></i>').join('')
     return '<div class="bay' + (open ? ' open' : '') + '"><div class="flipper">'
       // front
       + '<div class="face"><div class="unit ' + a.state + '">'
       + '<div class="unum">U' + String(i + 1).padStart(2, '0') + '</div>'
+      + '<div class="sled">' + sled + '</div>'
       + '<div class="led" title="' + a.state + '"></div>'
       + '<div class="plate" onclick="toggle(\\'' + a.name + '\\')" title="open unit">'
       +   '<div class="name">' + esc(a.name) + '<small>' + a.state + '</small><span class="hint">▸ open</span></div>'
