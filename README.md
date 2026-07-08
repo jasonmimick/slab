@@ -83,24 +83,28 @@ Rough order; nothing here is promised, everything here is intended.
    and the agent version: a coding agent in an isolated container with the
    workspace mounted, a budget cap, and results reported back through the
    same API the dashboard reads. This is the sandbox / AI-coding-task story.
-2. **Systems — wiring + isolation** ✅ SHIPPED (design + status: [docs/design/systems.md](docs/design/systems.md)).
+2. **Overview / zoom-out mode** — a bird's-eye grid when there are many
+   systems (imagine 1000 racks): each system a small tile, live status
+   colors, click a tile to fly into that rack. The dashboard scales from
+   one laptop to a wall of racks.
+3. **Systems — wiring + isolation** ✅ SHIPPED (design + status: [docs/design/systems.md](docs/design/systems.md)).
    A second manifest that groups apps into a system: one Docker network per
    system (members reach each other by app name), `public = false` members
    get no host port at all (the VPC moment), `[wires]` binds one app's needs
    to another's address. Membership is many-to-many — an app deploys once
    and can join several systems. Units never know about systems.
-3. **TTL + budget guardrails.** Every app gets an optional `ttl` and
+4. **TTL + budget guardrails.** Every app gets an optional `ttl` and
    spend/uptime budget in slab.toml; the daemon reaps what nobody remembered
    to turn off. Agents create infrastructure faster than humans track it —
    this is the founding lesson of the project.
-4. **Named tunnels.** Stable hostnames on your own domain (Cloudflare named
+5. **Named tunnels.** Stable hostnames on your own domain (Cloudflare named
    tunnels) instead of rotating trycloudflare URLs. Same code path as
    `expose`, config instead of chance.
-5. **Multi-target drivers — `slab deploy --target aws|fly`.** The Engine
+6. **Multi-target drivers — `slab deploy --target aws|fly`.** The Engine
    interface already isolates Docker; a second driver renders the same
    manifest to Fargate/Lambda/RDS (or Fly machines). One manifest, one verb
    set, many targets — agents never learn AWS, they learn slab.
-6. **Go rewrite (v1.0, decided).** TypeScript was the right spike language —
+7. **Go rewrite (v1.0, decided).** TypeScript was the right spike language —
    MCP SDK first-class, product-in-a-day. Go is the right shipping language:
    the entire container/networking neighborhood lives there (Docker client,
    `httputil.ReverseProxy`, cloudflared itself), goroutines match the

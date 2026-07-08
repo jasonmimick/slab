@@ -80,6 +80,10 @@ export function dashboardHtml(proxyPort: number): string {
   }
   .vents.slim { height: 28px; margin: 8px 18px 2px; }
   .cabinet + .cabinet { margin-top: 18px; }
+  #viz { cursor: pointer; }
+  .cabinet.flash { animation: flashcab 900ms ease-out; }
+  @keyframes flashcab { 0%, 30% { box-shadow: -9px 0 0 0 var(--accent), 9px 0 0 0 var(--accent), 0 0 30px color-mix(in srgb, var(--accent) 40%, transparent); } 100% { box-shadow: -9px 0 0 0 #241a12, 9px 0 0 0 #241a12, 0 12px 40px rgba(0,0,0,.5); } }
+  @media (prefers-reduced-motion: reduce) { .cabinet.flash { animation: none; } }
   .rack {
     background: var(--rail); border-top: 1px solid var(--groove);
     padding: 10px; box-shadow: inset 0 2px 10px rgba(0,0,0,.6);
@@ -105,26 +109,16 @@ export function dashboardHtml(proxyPort: number): string {
   @keyframes cursor { 50% { opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .cabmark::after { animation: none; } }
 
-  /* ── flat horizontal rotation: page <-> workbench (no depth, no zoom) ── */
+  /* ── workbench slides in from the right over the rack ── */
   #cube { position: relative; }
-  #face-bench { display: none; background: var(--bg); }
-  body.bench-anim { overflow: hidden; height: 100vh; }
-  body.bench-anim #face-rack, body.bench-anim #face-bench {
-    position: absolute; inset: 0; height: 100vh; overflow: hidden; display: block;
-    background: var(--bg);
+  #face-bench {
+    position: fixed; inset: 0; z-index: 60; background: var(--bg);
+    overflow: auto; padding: 24px clamp(16px, 3vw, 48px) 40px 72px;
+    transform: translateX(100%); transition: transform .42s cubic-bezier(.4,.0,.2,1);
+    box-shadow: -24px 0 60px rgba(0,0,0,.6);
   }
-  /* NO perspective anywhere: rotateY collapses flat about its own axis —
-     pure horizontal turn, nothing ever moves toward the camera */
-  body.bench-anim #face-rack { transform: rotateY(0deg); transition: transform .62s cubic-bezier(.5,0,.85,.4); }
-  body.bench-anim.p1 #face-rack { transform: rotateY(90deg); }
-  body.bench-anim #face-bench { transform: rotateY(-90deg); transition: transform .62s cubic-bezier(.15,.6,.3,1); }
-  body.bench-anim.p2 #face-bench { transform: rotateY(0deg); }
-  body.bench-anim #face-bench { padding: 24px clamp(16px, 3vw, 48px) 40px 72px; }
-  body.bench-static #face-rack { display: none; }
-  body.bench-static #face-bench { display: block; position: fixed; inset: 0; overflow: auto; z-index: 40; padding: 24px clamp(16px, 3vw, 48px) 40px 72px; }
-  @media (prefers-reduced-motion: reduce) {
-    body.bench-anim #face-rack, body.bench-anim #face-bench { transition: none; }
-  }
+  body.bench-open #face-bench { transform: translateX(0); }
+  @media (prefers-reduced-motion: reduce) { #face-bench { transition: none; } }
   .bench-head { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; }
   .bench-head h2 { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); }
   .benchback { background: none; border: 1px solid var(--edge); border-radius: 5px; color: var(--dim);
@@ -144,6 +138,22 @@ export function dashboardHtml(proxyPort: number): string {
   #bench-panel { background: linear-gradient(180deg, #17181d, #101116); border: 1px solid #2b2d34;
     border-radius: 10px; padding: 16px; position: sticky; top: 16px; }
   .bench-hint { color: var(--faint); font-size: 11px; text-align: center; padding: 30px 0; }
+  .viewport { border: 1px solid #2b2d34; border-radius: 8px; overflow: hidden; margin-bottom: 14px; background: #0b0c0e; }
+  .viewport .vpbar { display: flex; align-items: center; gap: 7px; padding: 5px 10px; font-size: 10px; color: var(--dim);
+    background: linear-gradient(180deg, #1c1e24, #141519); border-bottom: 1px solid #26282e; }
+  .viewport .vpdot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .viewport .vpopen { margin-left: auto; color: var(--blue); text-decoration: none; }
+  .viewport .vpopen:hover { text-decoration: underline; }
+  .viewport iframe { width: 100%; height: 300px; border: 0; display: block; background: #fff; }
+  .viewport.off { color: var(--faint); font-size: 11px; text-align: center; padding: 40px 12px; line-height: 1.7; }
+  .viewport.off span { color: #45474e; font-size: 10px; }
+  /* mini live thumbnail on the rack unit itself */
+  .thumb { width: 132px; height: 82px; border: 1px solid #2b2d34; border-radius: 5px; overflow: hidden;
+    background: #0b0c0e; position: relative; flex-shrink: 0; }
+  .thumb iframe { width: 528px; height: 328px; border: 0; transform: scale(.25); transform-origin: top left;
+    pointer-events: none; background: #fff; }
+  .thumb .tcap { position: absolute; inset: 0; cursor: pointer; }
+  .thumb.off { display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 9px; text-align: center; padding: 6px; }
   #bench-panel .pname { font-size: 16px; font-weight: 800; margin-bottom: 2px; }
   #bench-panel .pstate { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin-bottom: 12px; }
   #bench-panel .prow { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -200,7 +210,7 @@ export function dashboardHtml(proxyPort: number): string {
 
   /* front face: black-glass hi-fi component */
   .unit {
-    display: grid; grid-template-columns: 30px 1fr auto auto; gap: 20px; align-items: center;
+    display: grid; grid-template-columns: 30px 1fr auto auto auto; gap: 18px; align-items: center;
     background:
       repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px),
       linear-gradient(180deg, #202127 0%, #17181d 18%, #101116 60%, #15161b 100%);
@@ -505,6 +515,15 @@ function vuMeter(rpm, state) {
     + '<text x="10" y="12" font-size="6" fill="#5f626a">VU</text>'
     + '</svg>'
 }
+// tiny live thumbnail — only for running public apps (a scaled, inert iframe)
+function thumb(a) {
+  if (a.state === 'running' && a.manifest.public !== false && a.hostPort != null) {
+    const u = 'http://' + a.name + '.localhost:${proxyPort}/'
+    return '<div class="thumb"><iframe src="' + u + '" loading="lazy" scrolling="no" sandbox="allow-scripts allow-same-origin"></iframe>'
+      + '<a class="tcap" href="' + u + '" target="_blank" title="open ' + esc(a.name) + '"></a></div>'
+  }
+  return '<div class="thumb off">' + (a.manifest.public === false ? '🔒' : a.state === 'sleeping' ? '● zzz' : '○') + '</div>'
+}
 function bayHtml(a, i) {
   const url = 'http://' + a.name + '.localhost:${proxyPort}'
   const rpm = a.reqPerMin ?? 0
@@ -531,6 +550,7 @@ function bayHtml(a, i) {
     +   '</div>'
     +   (a.error ? '<div class="errmsg">' + esc(a.error.slice(0, 140)) + '</div>' : '')
     + '</div>'
+    + thumb(a)
     + '<div class="meter">' + vuMeter(rpm, a.state) + '<span class="lcd">' + String(rpm).padStart(3, '0') + ' req/min</span><span class="spark">' + spark(a.name) + '</span></div>'
     + '<div class="acts">'
     +   '<div class="row">'
@@ -561,11 +581,12 @@ function channelInfo(rackKey) {
 }
 function cabinetHtml(title, apps, slim, sys) {
   const rackKey = sys ? sys.name : null
+  const cabId = 'cab-' + (sys ? sys.name : 'slab')
   const sub = (sys
     ? '<span class="cabinfo">system - ' + sys.members.length + ' members - ' + Object.keys(sys.wires ?? {}).length + ' wires</span>'
       + '<button class="diagbtn" onclick="openDiagram(\\'' + esc(sys.name) + '\\')">&#8909; diagram</button>'
     : '') + channelInfo(rackKey)
-  return '<div class="cabinet">'
+  return '<div class="cabinet" id="' + cabId + '">'
     + '<div class="vents' + (slim ? ' slim' : '') + '"></div>'
     + '<div class="rack">' + apps.map((a, i) => bayHtml(a, i)).join('') + '</div>'
     + '<div class="cabmark">' + esc(title) + sub + '</div>'
@@ -867,6 +888,20 @@ function drawViz() {
   requestAnimationFrame(drawViz)
 }
 requestAnimationFrame(drawViz)
+document.getElementById('viz').addEventListener('click', (e) => {
+  const cv = e.currentTarget
+  const racks = rackOrder()
+  const total = appsCache.length
+  if (!total) return
+  const rel = (e.offsetX / cv.clientWidth) * total    // which app-column index
+  let acc = 0, hitRack = racks[0]
+  for (const r of racks) {
+    acc += appsCache.filter(a => rackOf(a.name) === r).length
+    if (rel < acc) { hitRack = r; break }
+  }
+  const el = document.getElementById('cab-' + (hitRack ?? 'slab'))
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 900) }
+})
 setInterval(() => {
   const now = Date.now()
   evtTimes = evtTimes.filter(t => now - t < 60_000)
@@ -884,40 +919,14 @@ function enterBench(sysName) {
   benchSys = sysName
   benchSel = null
   benchRender()
-  setHalfW()
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (reduced) {
-    document.body.classList.add('bench-static')
-    return
-  }
-  document.body.classList.add('bench-anim')
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    document.body.classList.add('bench-turned')
-    setTimeout(() => {
-      document.body.classList.remove('bench-anim', 'bench-turned')
-      document.body.classList.add('bench-static')
-    }, 1300)
-  }))
+  requestAnimationFrame(() => document.body.classList.add('bench-open'))
 }
 function exitBench() {
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (reduced) {
-    document.body.classList.remove('bench-static')
-    benchSys = null
-    return
-  }
-  document.body.classList.remove('bench-static')
-  document.body.classList.add('bench-anim', 'bench-turned')
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    document.body.classList.remove('bench-turned')
-    setTimeout(() => {
-      document.body.classList.remove('bench-anim')
-      benchSys = null
-    }, 1300)
-  }))
+  document.body.classList.remove('bench-open')
+  setTimeout(() => { benchSys = null }, 420)
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.body.classList.contains('bench-static')) exitBench()
+  if (e.key === 'Escape' && document.body.classList.contains('bench-open')) exitBench()
 })
 function benchSelect(name) {
   benchSel = name
@@ -946,9 +955,20 @@ function benchRender() {
   const rpm = a.reqPerMin ?? 0
   const wires = Object.entries(sys.wires ?? {}).filter(([k, v]) =>
     k.startsWith(a.name + '.') || new RegExp('//' + a.name + '([:/]|$)').test(v))
+  // live viewport: iframe the app itself when it's public + running
+  const canView = a.state === 'running' && a.manifest.public !== false && a.hostPort != null
+  const viewUrl = 'http://' + a.name + '.localhost:${proxyPort}/'
+  const viewport = canView
+    ? '<div class="viewport"><div class="vpbar"><span class="vpdot"></span>' + esc(a.name) + '.localhost'
+        + '<a href="' + viewUrl + '" target="_blank" class="vpopen">open ↗</a></div>'
+        + '<iframe src="' + viewUrl + '" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe></div>'
+    : a.manifest.public === false
+      ? '<div class="viewport off">🔒 private — no preview<br><span>reachable only inside ' + esc(benchSys) + '</span></div>'
+      : '<div class="viewport off">' + (a.state === 'sleeping' ? '● sleeping — start to preview' : '○ ' + a.state + ' — no preview') + '</div>'
   panel.innerHTML =
     '<div class="pname">' + esc(a.name) + '</div>'
     + '<div class="pstate">' + a.state + ' - ' + a.manifest.type + (a.manifest.public === false ? ' - private' : '') + ' - ' + rpm + ' req/min</div>'
+    + viewport
     + '<div class="prow">'
     +   '<button onclick="act(\\'' + a.name + '\\',\\'deploy\\')">deploy</button>'
     +   (a.state === 'running'
