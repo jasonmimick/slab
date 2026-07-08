@@ -455,16 +455,6 @@ async function main(): Promise<void> {
     res.send(dashboardHtml(PROXY_PORT))
   })
 
-  api.use((_req, res) => {
-    res.status(404).json({ error: 'not found' })
-  })
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  api.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err instanceof HttpError ? err.status : 500
-    res.status(status).json({ error: err.message || 'internal error' })
-  })
-
   // Live event stream (SSE) — the dashboard's audio monitor listens here
   const sseClients = new Set<Response>()
   function broadcast(event: Record<string, unknown>): void {
@@ -483,6 +473,16 @@ async function main(): Promise<void> {
     res.write('data: {"type":"hello"}\n\n')
     sseClients.add(res)
     req.on('close', () => { sseClients.delete(res) })
+  })
+
+  api.use((_req, res) => {
+    res.status(404).json({ error: 'not found' })
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  api.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err instanceof HttpError ? err.status : 500
+    res.status(status).json({ error: err.message || 'internal error' })
   })
 
   const lastRequestSaveAt = new Map<string, number>()
