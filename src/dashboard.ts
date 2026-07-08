@@ -215,9 +215,12 @@ export function dashboardHtml(proxyPort: number): string {
     background: #0b0c0e; border-top: 1px solid var(--edge); padding: 14px clamp(20px, 4vw, 56px);
     overflow: auto; font-size: 12px; white-space: pre-wrap; box-shadow: 0 -14px 40px rgba(0,0,0,.6);
   }
-  #drawer .bar { display: flex; justify-content: space-between; align-items: center; color: var(--faint);
+  #drawer .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--faint);
     font-size: 10px; text-transform: uppercase; letter-spacing: .16em; margin-bottom: 10px;
     position: sticky; top: 0; background: #0b0c0e; padding-bottom: 6px; }
+  #dapps { flex: 1; display: flex; gap: 6px; flex-wrap: wrap; }
+  #dapps button { text-transform: none; letter-spacing: 0; }
+  #dapps button.active { border-color: var(--amber); color: var(--amber); }
 
   @media (max-width: 720px) {
     .layout { grid-template-columns: 1fr; }
@@ -241,7 +244,7 @@ export function dashboardHtml(proxyPort: number): string {
 <div class="layout">
   <div class="spine">
     <span data-nav="status" onclick="navStatus()">S</span>
-    <span data-nav="logs — all apps" onclick="navLogs()">L</span>
+    <span data-nav="logs" onclick="navLogs()">L</span>
     <span data-nav="api — raw json" onclick="window.open('/v1/apps')">A</span>
     <span data-nav="boards — flip all" onclick="navBoards()">B</span>
     <div class="vent"></div><div class="vent"></div>
@@ -257,7 +260,7 @@ export function dashboardHtml(proxyPort: number): string {
   <span id="clock"></span>
 </footer>
 </div>
-<div id="drawer"><div class="bar"><span id="dtitle"></span><button onclick="drawer.style.display='none'">close</button></div><div id="dbody"></div></div>
+<div id="drawer"><div class="bar"><span id="dtitle"></span><span id="dapps"></span><button onclick="drawer.style.display='none'">close</button></div><div id="dbody"></div></div>
 <script>
 const drawer = document.getElementById('drawer')
 const hist = {}          // name -> recent reqPerMin samples
@@ -276,12 +279,19 @@ async function removeApp(name) {
   await fetch('/v1/apps/' + name, { method: 'DELETE' })
   load()
 }
+function logPicker(active) {
+  document.getElementById('dapps').innerHTML = appsCache.map(a =>
+    '<button class="' + (a.name === active ? 'active' : '') + '" onclick="showLogs(\\'' + a.name + '\\')">' + esc(a.name) + '</button>'
+  ).join('')
+}
 async function showLogs(name) {
+  document.getElementById('dtitle').textContent = 'logs'
+  logPicker(name)
+  document.getElementById('dbody').textContent = 'loading…'
+  drawer.style.display = 'block'
   const r = await fetch('/v1/apps/' + name + '/logs?tail=200')
   const d = await r.json()
-  document.getElementById('dtitle').textContent = 'logs — ' + name
   document.getElementById('dbody').textContent = d.logs ?? d.error ?? ''
-  drawer.style.display = 'block'
 }
 function rel(iso) {
   if (!iso) return 'never'
@@ -385,23 +395,16 @@ async function navStatus() {
   const r = await fetch('/v1/health')
   const h = await r.json()
   document.getElementById('dtitle').textContent = 'status'
+  document.getElementById('dapps').innerHTML = ''
   document.getElementById('dbody').textContent = JSON.stringify(h, null, 2)
   drawer.style.display = 'block'
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
-async function navLogs() {
-  document.getElementById('dtitle').textContent = 'logs — all apps'
-  document.getElementById('dbody').textContent = 'collecting…'
-  drawer.style.display = 'block'
-  const chunks = await Promise.all(appsCache.map(async a => {
-    if (a.state !== 'running') return ''
-    try {
-      const r = await fetch('/v1/apps/' + a.name + '/logs?tail=15')
-      const d = await r.json()
-      return '━━ ' + a.name + ' ' + '━'.repeat(Math.max(4, 40 - a.name.length)) + '\\n' + (d.logs ?? d.error ?? '')
-    } catch { return '' }
-  }))
-  document.getElementById('dbody').textContent = chunks.filter(Boolean).join('\\n') || 'no running apps'
+function navLogs() {
+  // per-app terminal: pick an app in the bar, or default to the first running one
+  const first = appsCache.find(a => a.state === 'running') ?? appsCache[0]
+  if (!first) return
+  showLogs(first.name)
 }
 function navBoards() {
   if (openBays.size) openBays.clear()
