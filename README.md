@@ -74,5 +74,34 @@ v0, weekend-spike maturity. Known sharp edges, honestly stated:
 - **Function wake latency** depends on the image; the proxy waits up to 15s
   for the container to answer before giving up.
 
-Roadmap sketches (not built): TTL/budget guardrails, `slab promote <app>
---to fly|cloudrun`.
+## Roadmap
+
+Rough order; nothing here is promised, everything here is intended.
+
+1. **Jobs — `slab run`** (v0.2 headline). A third app type beside service and
+   function: run-to-completion workloads. `slab run <git-url> -- npm test`,
+   and the agent version: a coding agent in an isolated container with the
+   workspace mounted, a budget cap, and results reported back through the
+   same API the dashboard reads. This is the sandbox / AI-coding-task story.
+2. **TTL + budget guardrails.** Every app gets an optional `ttl` and
+   spend/uptime budget in slab.toml; the daemon reaps what nobody remembered
+   to turn off. Agents create infrastructure faster than humans track it —
+   this is the founding lesson of the project.
+3. **Named tunnels.** Stable hostnames on your own domain (Cloudflare named
+   tunnels) instead of rotating trycloudflare URLs. Same code path as
+   `expose`, config instead of chance.
+4. **Multi-target drivers — `slab deploy --target aws|fly`.** The Engine
+   interface already isolates Docker; a second driver renders the same
+   manifest to Fargate/Lambda/RDS (or Fly machines). One manifest, one verb
+   set, many targets — agents never learn AWS, they learn slab.
+5. **Go rewrite (v1.0, decided).** TypeScript was the right spike language —
+   MCP SDK first-class, product-in-a-day. Go is the right shipping language:
+   the entire container/networking neighborhood lives there (Docker client,
+   `httputil.ReverseProxy`, cloudflared itself), goroutines match the
+   workload, and `GOOS=linux GOARCH=arm64` turns slab into a single static
+   binary you `brew install` — no Node runtime on the target machine. The
+   manifest, HTTP API, and MCP tool surface are the product and stay
+   byte-compatible; the daemon behind them is an implementation detail, and
+   `examples/` doubles as the acceptance suite. (Interim option if
+   distribution itches sooner: `bun build --compile` on the existing code.)
+
