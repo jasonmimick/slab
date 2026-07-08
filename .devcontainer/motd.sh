@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Printed at the top of every interactive terminal in a codespace (wired into
 # ~/.bashrc by setup.sh) — the user must never hunt for the dashboard URL.
+# some shells (ssh) miss the codespace env — recover it from a login shell
+if [ -z "${CODESPACE_NAME:-}" ]; then
+  eval "$(bash -lc 'echo CODESPACE_NAME=${CODESPACE_NAME:-}; echo GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN=${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}' 2>/dev/null)" || true
+fi
+
 DASH="http://localhost:7766"
 if [ -n "${CODESPACE_NAME:-}" ] && [ -n "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}" ]; then
   DASH="https://${CODESPACE_NAME}-7766.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
