@@ -30,6 +30,7 @@ export function loadManifest(sourceDir: string): Manifest {
     name,
     type,
     port,
+    public: raw.public !== false,
     image,
     postgres: raw.postgres === true,
     secrets: Array.isArray(raw.secrets) ? raw.secrets.map(String) : [],
@@ -46,4 +47,44 @@ export function parseDuration(s: string): number {
   if (!m) return 5 * 60 * 1000
   const n = Number(m[1])
   return m[2] === 's' ? n * 1000 : m[2] === 'm' ? n * 60_000 : n * 3_600_000
+}
+
+// ── system.toml ───────────────────────────────────────────────────────────────
+import { SystemManifest } from './types'
+
+export function loadSystemManifest(file: string): SystemManifest {
+  if (!fs.existsSync(file)) throw new Error(`No system manifest at ${file}`)
+  const raw = parse(fs.readFileSync(file, 'utf-8')) as Record<string, unknown>
+  const name = String(raw.name ?? '')
+  if (!NAME_RE.test(name)) {
+    throw new Error(`Invalid system name "${name}" — lowercase letters, digits, hyphens, 2-31 chars`)
+  }
+  const rawApps = (raw.apps ?? {}) as Record<string, { source?: unknown }>
+  const members: SystemManifest['members'] = {}
+  for (const [app, cfg] of Object.entries(rawApps)) {
+    if (!NAME_RE.test(app)) throw new Error(`Invalid member app name "${app}"`)
+    const source = String(cfg?.source ?? '')
+    if (!source) throw new Error(`Member "${app}" is missing source`)
+    members[app] = { source }
+  }
+  if (Object.keys(members).length === 0) throw new Error('System has no [apps.<name>] members')
+  const rawWires = (raw.wires ?? {}) as Record<string, unknown>
+  const wires: Record<string, string> = {}
+  // TOML nuance: unquoted `app.KEY = v` parses as a nested table, quoted
+  // `"app.KEY" = v` as a flat dotted key. Accept both shapes.
+  const flat: Array<[string, unknown]> = []
+  for (const [k, v] of Object.entries(rawWires)) {
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+      for (const [sub, sv] of Object.entries(v as Record<string, unknown>)) flat.push([`${k}.${sub}`, sv])
+    } else {
+      flat.push([k, v])
+    }
+  }
+  for (const [k, v] of flat) {
+    const m = /^([a-z][a-z0-9-]*)\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(k)
+    if (!m) throw new Error(`Invalid wire key "${k}" — expected <app>.<ENV_KEY>`)
+    if (!members[m[1]]) throw new Error(`Wire "${k}" targets "${m[1]}", which is not a member`)
+    wires[k] = String(v)
+  }
+  return { name, members, wires }
 }

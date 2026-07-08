@@ -288,6 +288,42 @@ async function main() {
     }
   )
 
+  server.registerTool(
+    'slab_system_deploy',
+    {
+      description:
+        'Deploy a system: a group of apps wired together on a private network. Members reach each other at http://<app-name>:<port>; [wires] in the manifest inject env vars; members with public=false in their slab.toml are reachable ONLY inside the system. Creates/updates the system and deploys every member in dependency order. Returns the system record and member app records.',
+      inputSchema: {
+        sourceFile: z.string().describe('Absolute path to a system.toml'),
+      },
+    },
+    async ({ sourceFile }) => {
+      try {
+        const { system } = await client.createSystem(sourceFile)
+        const { system: deployed, apps } = await client.deploySystem(system.name)
+        return ok({ system: deployed, apps })
+      } catch (err) {
+        return fail(err)
+      }
+    }
+  )
+
+  server.registerTool(
+    'slab_system_list',
+    {
+      description: 'List systems (app groups with private networks and wiring): members, wire count, last deploy.',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const { systems } = await client.listSystems()
+        return ok(systems)
+      } catch (err) {
+        return fail(err)
+      }
+    }
+  )
+
   const transport = new StdioServerTransport()
   await server.connect(transport)
   console.error('slab mcp server connected (stdio)')

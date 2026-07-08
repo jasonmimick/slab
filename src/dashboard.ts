@@ -73,6 +73,8 @@ export function dashboardHtml(proxyPort: number): string {
     mask-composite: intersect;
     opacity: .9;
   }
+  .vents.slim { height: 28px; margin: 8px 18px 2px; }
+  .cabinet + .cabinet { margin-top: 18px; }
   .rack {
     background: var(--rail); border-top: 1px solid var(--groove);
     padding: 10px; box-shadow: inset 0 2px 10px rgba(0,0,0,.6);
@@ -149,6 +151,7 @@ export function dashboardHtml(proxyPort: number): string {
   .routes a { color: var(--blue); text-decoration: none; margin-right: 18px; }
   .routes a.pub { color: var(--amber); }
   .routes a:hover, .routes a:focus-visible { text-decoration: underline; }
+  .routes .priv { color: var(--faint); margin-right: 18px; }
   a:focus-visible, button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 2px; }
   .errmsg { color: var(--red); font-size: 11px; margin-top: 6px; max-width: 420px; }
 
@@ -261,11 +264,7 @@ export function dashboardHtml(proxyPort: number): string {
     <span data-nav="api — raw json" onclick="window.open('/v1/apps')">A</span>
     <span data-nav="boards — flip all" onclick="navBoards()">B</span>
   </div>
-  <div class="cabinet">
-    <div class="vents"></div>
-    <div class="rack" id="rack"></div>
-    <div class="cabmark">slab</div>
-  </div>
+  <div id="cabinets"></div>
 </div>
 <footer>
   <span>ingress :${proxyPort} · api :7766</span>
@@ -279,6 +278,7 @@ const drawer = document.getElementById('drawer')
 const hist = {}          // name -> recent reqPerMin samples
 const openBays = new Set()  // names of flipped-open units (persists across refresh)
 let appsCache = []
+let systemsCache = []
 function toggle(name) {
   if (openBays.has(name)) openBays.delete(name); else openBays.add(name)
   render()
@@ -344,55 +344,81 @@ function boardHtml(a) {
     + (a.manifest.postgres ? chip('postgres', 'slab_' + a.name.replace(/-/g, '_'), true) : '')
     + chip('created', rel(a.createdAt))
 }
+function bayHtml(a, i) {
+  const url = 'http://' + a.name + '.localhost:${proxyPort}'
+  const rpm = a.reqPerMin ?? 0
+  const open = openBays.has(a.name)
+  const lit = a.state === 'running' ? Math.min(8, 1 + Math.ceil(Math.log2(rpm + 1))) : 1
+  const sled = Array.from({ length: 8 }, (_, k) => '<i class="' + (k < lit ? 'on' : '') + '"></i>').join('')
+  const priv = a.manifest.public === false
+  return '<div class="bay' + (open ? ' open' : '') + '"><div class="flipper">'
+    // front
+    + '<div class="face"><div class="unit ' + a.state + '">'
+    + '<div class="unum">U' + String(i + 1).padStart(2, '0') + '</div>'
+    + '<div class="sled">' + sled + '</div>'
+    + '<div class="led" title="' + a.state + '"></div>'
+    + '<div class="plate" onclick="toggle(\\'' + a.name + '\\')" title="open unit">'
+    +   '<div class="name">' + esc(a.name) + '<small>' + a.state + '</small><span class="hint">▸ open</span></div>'
+    +   '<div class="spec"><b>' + a.manifest.type + '</b> · ' + (a.manifest.image ? esc(a.manifest.image) : 'dockerfile')
+    +     (a.manifest.postgres ? ' · <b>postgres</b>' : '') + ' · v' + a.version + ' · deployed ' + rel(a.deployedAt) + '</div>'
+    +   '<div class="routes" onclick="event.stopPropagation()">'
+    +     (priv
+              ? '<span class="priv">🔒 private — system-only</span>'
+              : '<a href="' + url + '" target="_blank">' + esc(a.name) + '.localhost</a>')
+    +     (a.publicUrl ? '<a class="pub" href="' + esc(a.publicUrl) + '" target="_blank">' + esc(a.publicUrl.replace('https://', '')) + '</a>' : '')
+    +   '</div>'
+    +   (a.error ? '<div class="errmsg">' + esc(a.error.slice(0, 140)) + '</div>' : '')
+    + '</div>'
+    + '<div class="meter"><div class="rpm' + (rpm > 0 ? ' hot' : '') + '">' + rpm + '<small>req/min</small></div>' + spark(a.name) + '</div>'
+    + '<div class="acts">'
+    +   '<div class="row">'
+    +     '<button onclick="act(\\'' + a.name + '\\',\\'deploy\\')">deploy</button>'
+    +     (a.state === 'running'
+            ? '<button class="warn" onclick="act(\\'' + a.name + '\\',\\'stop\\')">stop</button>'
+            : '<button onclick="act(\\'' + a.name + '\\',\\'start\\')">start</button>')
+    +   '</div>'
+    +   '<div class="row">'
+    +     '<button onclick="showLogs(\\'' + a.name + '\\')">logs</button>'
+    +     (a.exposed
+            ? '<button class="warn" onclick="act(\\'' + a.name + '\\',\\'hide\\')">hide</button>'
+            : '<button class="hot" onclick="act(\\'' + a.name + '\\',\\'expose\\')">expose</button>')
+    +     '<button class="warn" onclick="removeApp(\\'' + a.name + '\\')">rm</button>'
+    +   '</div>'
+    + '</div>'
+    + '</div></div>'
+    // back
+    + '<div class="face back"><div class="board" onclick="toggle(\\'' + a.name + '\\')">' + boardHtml(a) + '</div></div>'
+    + '</div></div>'
+}
+function cabinetHtml(title, apps, slim) {
+  return '<div class="cabinet">'
+    + '<div class="vents' + (slim ? ' slim' : '') + '"></div>'
+    + '<div class="rack">' + apps.map((a, i) => bayHtml(a, i)).join('') + '</div>'
+    + '<div class="cabmark">' + esc(title) + '</div>'
+    + '</div>'
+}
 function render() {
   const apps = appsCache
-  document.getElementById('rack').innerHTML = apps.map((a, i) => {
-    const url = 'http://' + a.name + '.localhost:${proxyPort}'
-    const rpm = a.reqPerMin ?? 0
-    const open = openBays.has(a.name)
-    const lit = a.state === 'running' ? Math.min(8, 1 + Math.ceil(Math.log2(rpm + 1))) : 1
-    const sled = Array.from({ length: 8 }, (_, k) => '<i class="' + (k < lit ? 'on' : '') + '"></i>').join('')
-    return '<div class="bay' + (open ? ' open' : '') + '"><div class="flipper">'
-      // front
-      + '<div class="face"><div class="unit ' + a.state + '">'
-      + '<div class="unum">U' + String(i + 1).padStart(2, '0') + '</div>'
-      + '<div class="sled">' + sled + '</div>'
-      + '<div class="led" title="' + a.state + '"></div>'
-      + '<div class="plate" onclick="toggle(\\'' + a.name + '\\')" title="open unit">'
-      +   '<div class="name">' + esc(a.name) + '<small>' + a.state + '</small><span class="hint">▸ open</span></div>'
-      +   '<div class="spec"><b>' + a.manifest.type + '</b> · ' + (a.manifest.image ? esc(a.manifest.image) : 'dockerfile')
-      +     (a.manifest.postgres ? ' · <b>postgres</b>' : '') + ' · v' + a.version + ' · deployed ' + rel(a.deployedAt) + '</div>'
-      +   '<div class="routes" onclick="event.stopPropagation()"><a href="' + url + '" target="_blank">' + esc(a.name) + '.localhost</a>'
-      +     (a.publicUrl ? '<a class="pub" href="' + esc(a.publicUrl) + '" target="_blank">' + esc(a.publicUrl.replace('https://', '')) + '</a>' : '')
-      +   '</div>'
-      +   (a.error ? '<div class="errmsg">' + esc(a.error.slice(0, 140)) + '</div>' : '')
-      + '</div>'
-      + '<div class="meter"><div class="rpm' + (rpm > 0 ? ' hot' : '') + '">' + rpm + '<small>req/min</small></div>' + spark(a.name) + '</div>'
-      + '<div class="acts">'
-      +   '<div class="row">'
-      +     '<button onclick="act(\\'' + a.name + '\\',\\'deploy\\')">deploy</button>'
-      +     (a.state === 'running'
-              ? '<button class="warn" onclick="act(\\'' + a.name + '\\',\\'stop\\')">stop</button>'
-              : '<button onclick="act(\\'' + a.name + '\\',\\'start\\')">start</button>')
-      +   '</div>'
-      +   '<div class="row">'
-      +     '<button onclick="showLogs(\\'' + a.name + '\\')">logs</button>'
-      +     (a.exposed
-              ? '<button class="warn" onclick="act(\\'' + a.name + '\\',\\'hide\\')">hide</button>'
-              : '<button class="hot" onclick="act(\\'' + a.name + '\\',\\'expose\\')">expose</button>')
-      +     '<button class="warn" onclick="removeApp(\\'' + a.name + '\\')">rm</button>'
-      +   '</div>'
-      + '</div>'
-      + '</div></div>'
-      // back
-      + '<div class="face back"><div class="board" onclick="toggle(\\'' + a.name + '\\')">' + boardHtml(a) + '</div></div>'
-      + '</div></div>'
-  }).join('') || '<div class="empty">rack is empty — <code>slab deploy ./yourapp</code> mounts the first unit</div>'
+  const systems = systemsCache
+  const container = document.getElementById('cabinets')
+  if (!apps.length) {
+    container.innerHTML = '<div class="cabinet"><div class="vents"></div>'
+      + '<div class="rack"><div class="empty">rack is empty — <code>slab deploy ./yourapp</code> mounts the first unit</div></div>'
+      + '<div class="cabmark">slab</div></div>'
+    return
+  }
+  const sorted = [...systems].sort((x, y) => x.name.localeCompare(y.name))
+  let html = sorted.map(s => cabinetHtml(s.name, apps.filter(a => s.members.includes(a.name)), true)).join('')
+  const solo = apps.filter(a => !systems.some(s => s.members.includes(a.name)))
+  if (solo.length) html += cabinetHtml('slab', solo, false)
+  container.innerHTML = html
 }
 async function load() {
-  const r = await fetch('/v1/apps')
+  const [r, rs] = await Promise.all([fetch('/v1/apps'), fetch('/v1/systems')])
   const d = await r.json()
   appsCache = d.apps ?? []
+  systemsCache = []
+  try { const ds = await rs.json(); systemsCache = ds.systems ?? [] } catch (e) {}
   let totalRpm = 0
   for (const a of appsCache) {
     const rpm = a.reqPerMin ?? 0

@@ -5,7 +5,7 @@ import { Command } from 'commander'
 import { client, appUrl } from './api-client'
 import { loadManifest } from './manifest'
 import { looksLikeGitUrl } from './git'
-import { AppRecord } from './types'
+import { AppRecord, SystemRecord } from './types'
 
 function fail(err: unknown): never {
   const msg = err instanceof Error ? err.message : String(err)
@@ -111,6 +111,24 @@ program
   }))
 
 program
+  .command('up <file>')
+  .description('deploy a system (a group of apps wired together) from a system.toml')
+  .action(action(async (file: string) => {
+    const asPath = path.resolve(file)
+    const sourceFile = isDir(asPath) ? path.join(asPath, 'system.toml') : asPath
+    const { system } = await client.createSystem(sourceFile)
+    const { system: deployed, apps } = await client.deploySystem(system.name)
+    const { proxyPort } = await client.health()
+    const byName = new Map(apps.map((app) => [app.name, app]))
+    for (const name of deployed.members) {
+      const app = byName.get(name)
+      const loc = app && app.manifest.public !== false ? appUrl(app, proxyPort) : 'private'
+      console.log(`  ${name} -> ${loc}`)
+    }
+    console.log(`system ${deployed.name} up (${deployed.members.length} apps)`)
+  }))
+
+program
   .command('list')
   .description('list apps')
   .action(action(async () => {
@@ -123,6 +141,25 @@ program
       app.state,
       appUrl(app, proxyPort),
       relativeTime(app.deployedAt),
+    ])
+    const widths = header.map((h, i) => Math.max(h.length, ...cols.map((r) => r[i].length), 0))
+    const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i] + 2)).join('').trimEnd()
+    console.log(line(header))
+    for (const r of cols) console.log(line(r))
+  }))
+
+program
+  .command('systems')
+  .description('list systems')
+  .action(action(async () => {
+    const { systems } = await client.listSystems()
+    const rows = systems as SystemRecord[]
+    const header = ['NAME', 'MEMBERS', 'WIRES', 'DEPLOYED']
+    const cols = rows.map((sys) => [
+      sys.name,
+      sys.members.join(','),
+      String(Object.keys(sys.wires).length),
+      relativeTime(sys.deployedAt),
     ])
     const widths = header.map((h, i) => Math.max(h.length, ...cols.map((r) => r[i].length), 0))
     const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i] + 2)).join('').trimEnd()
@@ -214,6 +251,16 @@ program
   .action(action(async (name: string) => {
     await client.hide(name)
     console.log(`hidden ${name}`)
+  }))
+
+const system = program.command('system').description('manage systems')
+
+system
+  .command('rm <name>')
+  .description('detach a system (removes the network + record, keeps member apps)')
+  .action(action(async (name: string) => {
+    await client.removeSystem(name)
+    console.log(`detached system ${name} (apps kept)`)
   }))
 
 program

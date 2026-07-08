@@ -79,6 +79,10 @@ export function createProxy(deps: ProxyDeps): http.Server {
       sendJson(res, 404, { error: 'unknown app' })
       return
     }
+    if (app.manifest.public === false) {
+      sendJson(res, 403, { error: 'app is private — reachable only inside its systems' })
+      return
+    }
     if (app.hostPort == null) {
       sendJson(res, 503, { error: 'app has never been deployed' })
       return

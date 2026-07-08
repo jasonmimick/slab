@@ -8,6 +8,8 @@ export interface Manifest {
   name: string
   type: AppType
   port: number              // port the app listens on INSIDE the container
+  public?: boolean          // default true. false -> no host port, no ingress:
+                            // reachable ONLY by system-mates (docs/design/systems.md)
   image?: string            // prebuilt image (e.g. "nginx:alpine") — pull & run, no build.
                             // Omit to build from the Dockerfile in the source dir.
   postgres?: boolean        // true -> slab provisions a DB and injects DATABASE_URL
@@ -37,6 +39,7 @@ export interface AppRecord {
 
 export interface SlabState {
   apps: Record<string, AppRecord>
+  systems?: Record<string, SystemRecord>   // optional for state-file back-compat
   nextHostPort: number      // starts at 20000
 }
 
@@ -72,10 +75,11 @@ export interface Engine {
   // If manifest.image is set: docker pull it and return it as the tag.
   // Otherwise: docker build the app's sourceDir, tag slab/<name>:<version>.
   buildImage(app: AppRecord): Promise<string>
-  // Start a container for the app: labels {'slab.app': name}, port mapping
-  // hostPort->manifest.port, env = secrets + static env + DATABASE_URL (if postgres).
-  // Stops/removes any previous container for this app first. Returns containerId.
-  runContainer(app: AppRecord, imageTag: string, env: Record<string, string>): Promise<string>
+  // Start a container for the app: labels {'slab.app': name}, env injected.
+  // opts.publish=false -> NO port binding (private member, network-only).
+  // opts.networks: slab system networks to join (alias = app name), joined
+  // after start. Stops/removes any previous container first. Returns id.
+  runContainer(app: AppRecord, imageTag: string, env: Record<string, string>, opts?: { publish?: boolean; networks?: string[] }): Promise<string>
   stopContainer(app: AppRecord): Promise<void>       // stop, keep container (functions sleep this way)
   startContainer(app: AppRecord): Promise<void>      // docker start existing container
   removeContainer(app: AppRecord): Promise<void>     // stop + rm
@@ -86,4 +90,53 @@ export interface Engine {
   // volume slab-pgdata, host port 20432) is up, and that a database named
   // slab_<app> exists. Returns the DATABASE_URL to inject.
   ensurePostgres(appName: string): Promise<string>
+  // ── system network layer ──
+  ensureNetwork(name: string): Promise<void>                     // create if missing (slab-net-<system>)
+  removeNetwork(name: string): Promise<void>                     // tolerate missing/in-use errors by throwing clear messages
+  connectNetworks(app: AppRecord, networks: string[]): Promise<void>  // connect container to each with alias = app.name; tolerate already-connected
 }
+
+// ── Systems: wiring + isolation (docs/design/systems.md) ─────────────────────
+// A system groups apps: one Docker network per system (members reach each
+// other at http://<app-name>:<container-port> via Docker DNS), plus [wires]
+// env bindings. Membership is many-to-many: an app deploys once and joins
+// every system it belongs to.
+
+export interface SystemManifest {
+  name: string                        // same NAME_RE rules as apps
+  members: Record<string, { source: string }>   // app name -> source dir/git url
+  wires: Record<string, string>       // "<app>.<ENV_KEY>" -> value (usually http://<member>:<port>/..)
+}
+
+export interface SystemRecord {
+  name: string
+  sourceFile: string                  // absolute path to the system.toml
+  members: string[]                   // app names
+  wires: Record<string, string>
+  createdAt: string
+  deployedAt: string | null
+}
+
+// state.systems: Record<string, SystemRecord> — added alongside apps.
+// Wire-env resolution at app deploy: collect wires targeting the app from ALL
+// systems it belongs to; the same key bound to different values in two
+// systems is a HARD deploy error naming both systems.
+//
+// New API routes:
+//   GET    /v1/systems                    -> { systems: SystemRecord[] }
+//   POST   /v1/systems                    -> body { sourceFile } (abs path to system.toml)
+//                                            parses manifest, creates/updates record,
+//                                            auto-creates unknown member apps from source -> { system }
+//   DELETE /v1/systems/:name              -> detach members (disconnect network), remove network
+//                                            + record. NEVER deletes member apps -> 204
+//   POST   /v1/systems/:name/deploy       -> deploy all members (topo order by wires),
+//                                            join network, inject wires -> { system, apps }
+//
+// Engine additions (network layer):
+//   ensureNetwork(name): Promise<void>            // docker network slab-net-<system>
+//   removeNetwork(name): Promise<void>            // tolerate missing
+//   connectNetworks(app, networks): Promise<void> // connect app's container to each
+//                                                 // network with alias = app name;
+//                                                 // tolerate already-connected
+// runContainer gains opts: { publish: boolean; networks: string[] } —
+// publish=false -> NO PortBindings (isolated); networks joined after start.

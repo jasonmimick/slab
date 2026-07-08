@@ -161,8 +161,15 @@ export function createEngine(): Engine {
     }
   }
 
-  async function runContainer(app: AppRecord, imageTag: string, env: Record<string, string>): Promise<string> {
-    if (app.hostPort == null) {
+  async function runContainer(
+    app: AppRecord,
+    imageTag: string,
+    env: Record<string, string>,
+    opts?: { publish?: boolean; networks?: string[] },
+  ): Promise<string> {
+    const publish = opts?.publish ?? true
+
+    if (publish && app.hostPort == null) {
       throw new Error(`app ${app.name} has no hostPort allocated`)
     }
 
@@ -176,9 +183,11 @@ export function createEngine(): Engine {
         Image: imageTag,
         Labels: { 'slab.app': app.name },
         Env: Object.entries(env).map(([k, v]) => `${k}=${v}`),
-        ExposedPorts: { [portKey]: {} },
+        ExposedPorts: publish ? { [portKey]: {} } : undefined,
         HostConfig: {
-          PortBindings: { [portKey]: [{ HostIp: '127.0.0.1', HostPort: String(app.hostPort) }] },
+          PortBindings: publish
+            ? { [portKey]: [{ HostIp: '127.0.0.1', HostPort: String(app.hostPort) }] }
+            : undefined,
           RestartPolicy: { Name: app.manifest.type === 'service' ? 'unless-stopped' : 'no' },
         },
       })
@@ -193,7 +202,74 @@ export function createEngine(): Engine {
       throw new Error(`failed to start container for ${app.name}: ${errMsg(err)}`)
     }
 
+    if (opts?.networks && opts.networks.length > 0) {
+      await connectNetworks(app, opts.networks)
+    }
+
     return container.id
+  }
+
+  // ── system network layer ────────────────────────────────────────────────
+
+  function isNetworkConflict(err: unknown): boolean {
+    const code = (err as { statusCode?: number } | null)?.statusCode
+    const message = errMsg(err)
+    return code === 409 || /already exists/i.test(message)
+  }
+
+  async function ensureNetwork(name: string): Promise<void> {
+    try {
+      await docker.createNetwork({ Name: name, Driver: 'bridge', Labels: { 'slab.system': name } })
+    } catch (err) {
+      if (!isNetworkConflict(err) && !isIgnorable(err)) {
+        throw new Error(`failed to create network ${name}: ${errMsg(err)}`)
+      }
+    }
+  }
+
+  async function removeNetwork(name: string): Promise<void> {
+    const network = docker.getNetwork(name)
+    try {
+      await network.remove()
+      return
+    } catch (err) {
+      if (isIgnorable(err)) return
+      // Fall through: likely "has active endpoints" — disconnect members and retry.
+    }
+
+    try {
+      const info = await network.inspect()
+      const containerIds = Object.keys(info.Containers ?? {})
+      for (const id of containerIds) {
+        await network.disconnect({ Container: id, Force: true }).catch((err) => {
+          if (!isIgnorable(err)) throw new Error(`failed to disconnect ${id} from network ${name}: ${errMsg(err)}`)
+        })
+      }
+    } catch (err) {
+      if (isIgnorable(err)) return
+      throw new Error(`failed to inspect network ${name} for removal: ${errMsg(err)}`)
+    }
+
+    try {
+      await network.remove()
+    } catch (err) {
+      if (!isIgnorable(err)) throw new Error(`failed to remove network ${name}: ${errMsg(err)}`)
+    }
+  }
+
+  async function connectNetworks(app: AppRecord, networks: string[]): Promise<void> {
+    const c = await resolveContainer(app)
+    if (!c) throw new Error(`no container found for app ${app.name}`)
+    const id = c.id
+
+    for (const name of networks) {
+      try {
+        await docker.getNetwork(name).connect({ Container: id, EndpointConfig: { Aliases: [app.name] } })
+      } catch (err) {
+        if (isNetworkConflict(err)) continue
+        throw new Error(`failed to connect ${app.name} to network ${name}: ${errMsg(err)}`)
+      }
+    }
   }
 
   async function stopContainer(app: AppRecord): Promise<void> {
@@ -340,5 +416,8 @@ export function createEngine(): Engine {
     getLogs,
     isRunning,
     ensurePostgres,
+    ensureNetwork,
+    removeNetwork,
+    connectNetworks,
   }
 }

@@ -1,0 +1,12 @@
+# Demo system: hello-service (public) wired to internal-api (private).
+# Deploy: slab up examples/demo.system.toml
+name = "demo"
+
+[apps.hello-service]
+source = "./hello-service"
+
+[apps.internal-api]
+source = "./internal-api"
+
+[wires]
+"hello-service.UPSTREAM_URL" = "http://internal-api:80"

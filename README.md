@@ -83,7 +83,7 @@ Rough order; nothing here is promised, everything here is intended.
    and the agent version: a coding agent in an isolated container with the
    workspace mounted, a budget cap, and results reported back through the
    same API the dashboard reads. This is the sandbox / AI-coding-task story.
-2. **Systems — wiring + isolation** (design: [docs/design/systems.md](docs/design/systems.md)).
+2. **Systems — wiring + isolation** ✅ SHIPPED (design + status: [docs/design/systems.md](docs/design/systems.md)).
    A second manifest that groups apps into a system: one Docker network per
    system (members reach each other by app name), `public = false` members
    get no host port at all (the VPC moment), `[wires]` binds one app's needs

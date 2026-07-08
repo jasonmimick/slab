@@ -1,5 +1,9 @@
 # Design: systems — wiring, isolation, and the decoupling principle
-_Status: design only, not built. Target: v0.3 (possibly v0.2 alongside jobs)._
+_Status: **v0 BUILT** (2026-07-07). `slab up <system.toml>`, `slab systems`,
+`slab system rm`; MCP: `slab_system_deploy` / `slab_system_list`. `public`
+lives in the app's own slab.toml (rule 3 enforced by design). Verified:
+private members have no host port + 403 at ingress, system-mates reach them
+via Docker DNS, wires inject env, per-system cabinets in the dashboard._
 
 ## The gap
 

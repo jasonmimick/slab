@@ -1,5 +1,5 @@
 // Thin HTTP client for the slab daemon — shared by the CLI and the MCP server.
-import { AppRecord, DAEMON_PORT } from './types'
+import { AppRecord, DAEMON_PORT, SystemRecord } from './types'
 
 const BASE = process.env.SLAB_DAEMON_URL ?? `http://127.0.0.1:${DAEMON_PORT}`
 
@@ -39,6 +39,10 @@ export const client = {
   listSecretKeys: (name: string) => req<{ keys: string[] }>('GET', `/v1/apps/${name}/secrets`),
   expose: (name: string) => req<{ app: AppRecord }>('POST', `/v1/apps/${name}/expose`),
   hide: (name: string) => req<{ app: AppRecord }>('POST', `/v1/apps/${name}/hide`),
+  listSystems: () => req<{ systems: SystemRecord[] }>('GET', '/v1/systems'),
+  createSystem: (sourceFile: string) => req<{ system: SystemRecord }>('POST', '/v1/systems', { sourceFile }),
+  deploySystem: (name: string) => req<{ system: SystemRecord; apps: AppRecord[] }>('POST', `/v1/systems/${name}/deploy`),
+  removeSystem: (name: string) => req<void>('DELETE', `/v1/systems/${name}`),
 }
 
 export function appUrl(app: AppRecord, proxyPort: number): string {

@@ -1,0 +1,7 @@
+# Demo: a PRIVATE system member — no host port, no ingress.
+# Reachable ONLY by apps in the same system, at http://internal-api:80.
+name = "internal-api"
+type = "service"
+image = "traefik/whoami"
+port = 80
+public = false
