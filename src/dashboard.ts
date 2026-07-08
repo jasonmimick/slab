@@ -58,9 +58,13 @@ export function dashboardHtml(proxyPort: number): string {
   .cabinet {
     background: linear-gradient(180deg, #101114, #0c0d10);
     border: 1px solid var(--groove); border-radius: 12px;
+    border-left: 9px solid transparent; border-right: 9px solid transparent;
+    background-clip: padding-box; position: relative;
     box-shadow: 0 12px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
     overflow: hidden;
   }
+  .cabinet::before, .cabinet + .cabinet::before { content: none; }
+  .cabinet { box-shadow: -9px 0 0 0 #241a12, 9px 0 0 0 #241a12, -9px 2px 8px rgba(0,0,0,.5), 9px 2px 8px rgba(0,0,0,.5), 0 12px 40px rgba(0,0,0,.5); }
   .vents {
     height: 64px; margin: 14px 18px 4px;
     background:
@@ -108,26 +112,28 @@ export function dashboardHtml(proxyPort: number): string {
   .face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 7px; }
   .face.back { transform: rotateX(180deg); }
 
-  /* front face: the machined unit */
+  /* front face: black-glass hi-fi component */
   .unit {
-    display: grid; grid-template-columns: 18px 1fr auto auto; gap: 20px; align-items: center;
-    background: linear-gradient(180deg, var(--unit-hi), var(--unit-lo));
-    border: 1px solid var(--edge); border-radius: 7px;
-    padding: 18px 22px 18px 62px; position: relative; height: 100%;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 4px 10px rgba(0,0,0,.35);
+    display: grid; grid-template-columns: 30px 1fr auto auto; gap: 20px; align-items: center;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #202127 0%, #17181d 18%, #101116 60%, #15161b 100%);
+    border: 1px solid #2b2d34; border-radius: 8px;
+    padding: 16px 22px 16px 62px; position: relative; height: 100%;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -1px 0 rgba(0,0,0,.6), 0 5px 14px rgba(0,0,0,.45);
   }
-  /* sled edge: PCB strip with activity LEDs (lit count tracks req/min) */
+  /* level meter: vertical LED ladder, green -> amber -> red (lit = activity) */
   .sled {
-    position: absolute; left: 30px; top: 8px; bottom: 8px; width: 16px;
-    background: linear-gradient(180deg, #1c2b20, #14211a);
-    border: 1px solid #2a3d2f; border-radius: 3px;
-    display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
+    position: absolute; left: 32px; top: 10px; bottom: 10px; width: 12px;
+    background: #0b0c0e; border: 1px solid #26282e; border-radius: 3px;
+    display: flex; flex-direction: column-reverse; justify-content: space-evenly; align-items: center;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.8);
   }
-  .sled i {
-    width: 5px; height: 5px; border-radius: 1px; background: #223228;
-  }
-  .sled i.on { background: #f2f6ef; box-shadow: 0 0 5px rgba(242,246,239,.9), 0 0 12px rgba(242,246,239,.35); }
-  .sleeping .sled i.on, .stopped .sled i.on, .created .sled i.on { background: #5a6a5e; box-shadow: none; }
+  .sled i { width: 6px; height: 3px; border-radius: 1px; background: #23252a; }
+  .sled i.on { background: var(--green); box-shadow: 0 0 4px var(--green); }
+  .sled i.on:nth-child(6), .sled i.on:nth-child(7) { background: var(--amber); box-shadow: 0 0 4px var(--amber); }
+  .sled i.on:nth-child(8) { background: var(--red); box-shadow: 0 0 5px var(--red); }
+  .sleeping .sled i.on, .stopped .sled i.on, .created .sled i.on { background: #4a4d55; box-shadow: none; }
   .bay:not(.open):hover .unit { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 18px rgba(0,0,0,.45); }
   .unit::before, .unit::after {
     content: ''; position: absolute; width: 5px; height: 5px; border-radius: 50%;
@@ -143,14 +149,23 @@ export function dashboardHtml(proxyPort: number): string {
     border-radius: 7px 0 0 7px; writing-mode: vertical-rl;
   }
 
-  .led { width: 10px; height: 10px; border-radius: 50%; justify-self: center; }
-  .running .led { background: var(--green); box-shadow: 0 0 10px var(--green), 0 0 2px var(--green); animation: breathe 2.8s ease-in-out infinite; }
-  .sleeping .led { background: var(--blue); opacity: .65; box-shadow: 0 0 5px rgba(130,184,232,.4); }
-  .stopped .led, .created .led { background: #3a3d44; }
-  .error .led { background: var(--red); box-shadow: 0 0 10px var(--red); }
-  .building .led { background: var(--amber); box-shadow: 0 0 10px var(--amber); animation: breathe .9s ease-in-out infinite; }
-  @keyframes breathe { 50% { opacity: .3; box-shadow: none; } }
-  @media (prefers-reduced-motion: reduce) { .led { animation: none !important; } }
+  .pwr {
+    width: 26px; height: 26px; border-radius: 50%; justify-self: center; cursor: pointer;
+    background: radial-gradient(circle at 35% 30%, #2e3138, #16171b 70%);
+    border: 1px solid #3a3d45; position: relative; padding: 0;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.06);
+  }
+  .pwr::after {
+    content: ''; position: absolute; inset: 7px; border-radius: 50%;
+    background: #33363e; transition: background .2s, box-shadow .2s;
+  }
+  .running .pwr::after { background: var(--green); box-shadow: 0 0 9px var(--green); animation: breathe 2.8s ease-in-out infinite; }
+  .sleeping .pwr::after { background: var(--blue); box-shadow: 0 0 6px rgba(130,184,232,.5); }
+  .error .pwr::after { background: var(--red); box-shadow: 0 0 9px var(--red); }
+  .building .pwr::after { background: var(--amber); box-shadow: 0 0 9px var(--amber); animation: breathe .9s ease-in-out infinite; }
+  .pwr:hover { border-color: var(--faint); }
+  @keyframes breathe { 50% { opacity: .35; box-shadow: none; } }
+  @media (prefers-reduced-motion: reduce) { .pwr::after { animation: none !important; } }
 
   .plate { cursor: pointer; }
   .plate .name { font-size: 17px; font-weight: 800; letter-spacing: .01em; }
@@ -167,12 +182,17 @@ export function dashboardHtml(proxyPort: number): string {
   a:focus-visible, button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 2px; }
   .errmsg { color: var(--red); font-size: 11px; margin-top: 6px; max-width: 420px; }
 
-  .meter { text-align: right; min-width: 120px; }
-  .meter .rpm { font-size: 20px; font-weight: 700; color: var(--faint); }
-  .meter .rpm.hot { color: var(--text); }
-  .meter .rpm small { font-size: 10px; color: var(--faint); font-weight: 500; margin-left: 2px; }
-  .meter svg { display: block; margin: 4px 0 0 auto; opacity: .9; }
-  .meter svg path { stroke: var(--accent); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 45%, transparent)); }
+  .meter { text-align: right; min-width: 130px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .vu { display: block; }
+  .vu .needle { transition: transform .8s cubic-bezier(.3,1.4,.4,1); transform-origin: 48px 46px; }
+  @media (prefers-reduced-motion: reduce) { .vu .needle { transition: none; } }
+  .lcd {
+    background: #0a0b08; border: 1px solid #2a2c26; border-radius: 3px;
+    padding: 1px 8px; font-size: 10px; letter-spacing: .12em; color: var(--accent);
+    box-shadow: inset 0 1px 4px rgba(0,0,0,.85);
+    text-shadow: 0 0 4px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  .meter .spark path { stroke: var(--accent); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 45%, transparent)); }
 
   .acts { display: flex; flex-direction: column; gap: 6px; opacity: 0; transition: opacity .15s; }
   .bay:hover .acts, .acts:focus-within { opacity: 1; }
@@ -357,6 +377,28 @@ function boardHtml(a) {
     + (a.manifest.postgres ? chip('postgres', 'slab_' + a.name.replace(/-/g, '_'), true) : '')
     + chip('created', rel(a.createdAt))
 }
+// Analog VU meter: needle swings with req/min (log scale). Pivot at (48,46).
+function vuMeter(rpm, state) {
+  const angle = -48 + Math.min(96, Math.log2(rpm + 1) * 16)   // -48deg..+48deg
+  const ticks = []
+  for (let t = -48; t <= 48; t += 12) {
+    const rad = (t - 90) * Math.PI / 180
+    const x1 = 48 + Math.cos(rad) * 34, y1 = 46 + Math.sin(rad) * 34
+    const x2 = 48 + Math.cos(rad) * (t === -48 || t === 48 || t === 0 ? 28 : 30)
+    const y2 = 46 + Math.sin(rad) * (t === -48 || t === 48 || t === 0 ? 28 : 30)
+    ticks.push('<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="' + (t > 24 ? 'var(--red)' : '#5f626a') + '" stroke-width="1.2"/>')
+  }
+  const dead = state !== 'running'
+  return '<svg class="vu" width="96" height="50" viewBox="0 0 96 50">'
+    + '<rect x="1" y="1" width="94" height="48" rx="5" fill="#0d0e0a" stroke="#2a2c26"/>'
+    + '<ellipse cx="48" cy="46" rx="40" ry="38" fill="color-mix(in srgb, var(--accent) ' + (dead ? '4' : '10') + '%, transparent)"/>'
+    + ticks.join('')
+    + '<line class="needle" x1="48" y1="46" x2="48" y2="14" stroke="' + (dead ? '#4a4d55' : 'var(--accent)') + '" stroke-width="1.6"'
+    +   ' style="transform: rotate(' + (dead ? -48 : angle).toFixed(1) + 'deg)"/>'
+    + '<circle cx="48" cy="46" r="3" fill="#2a2c30"/>'
+    + '<text x="10" y="12" font-size="6" fill="#5f626a">VU</text>'
+    + '</svg>'
+}
 function bayHtml(a, i) {
   const url = 'http://' + a.name + '.localhost:${proxyPort}'
   const rpm = a.reqPerMin ?? 0
@@ -369,7 +411,8 @@ function bayHtml(a, i) {
     + '<div class="face"><div class="unit ' + a.state + '">'
     + '<div class="unum">U' + String(i + 1).padStart(2, '0') + '</div>'
     + '<div class="sled">' + sled + '</div>'
-    + '<div class="led" title="' + a.state + '"></div>'
+    + '<button class="pwr" title="' + (a.state === 'running' ? 'power off (stop)' : 'power on (start)') + '"'
+    +   ' onclick="event.stopPropagation(); act(\\'' + a.name + '\\', \\'' + (a.state === 'running' ? 'stop' : 'start') + '\\')"></button>'
     + '<div class="plate" onclick="toggle(\\'' + a.name + '\\')" title="open unit">'
     +   '<div class="name">' + esc(a.name) + '<small>' + a.state + '</small><span class="hint">▸ open</span></div>'
     +   '<div class="spec"><b>' + a.manifest.type + '</b> · ' + (a.manifest.image ? esc(a.manifest.image) : 'dockerfile')
@@ -382,7 +425,7 @@ function bayHtml(a, i) {
     +   '</div>'
     +   (a.error ? '<div class="errmsg">' + esc(a.error.slice(0, 140)) + '</div>' : '')
     + '</div>'
-    + '<div class="meter"><div class="rpm' + (rpm > 0 ? ' hot' : '') + '">' + rpm + '<small>req/min</small></div>' + spark(a.name) + '</div>'
+    + '<div class="meter">' + vuMeter(rpm, a.state) + '<span class="lcd">' + String(rpm).padStart(3, '0') + ' req/min</span><span class="spark">' + spark(a.name) + '</span></div>'
     + '<div class="acts">'
     +   '<div class="row">'
     +     '<button onclick="act(\\'' + a.name + '\\',\\'deploy\\')">deploy</button>'
