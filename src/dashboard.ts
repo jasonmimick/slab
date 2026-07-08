@@ -89,6 +89,7 @@ export function dashboardHtml(proxyPort: number): string {
   }
   .cabmark::after { content: '_'; animation: cursor 1.2s steps(1) infinite; }
   .cabinfo { color: var(--faint); font-size: 10px; margin-left: 14px; letter-spacing: .1em; text-transform: uppercase; }
+  .chinfo { float: right; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; margin-right: 14px; opacity: .9; }
   .diagbtn { float: right; background: none; border: 1px solid var(--edge); border-radius: 4px; color: var(--dim);
     font: inherit; font-size: 10px; padding: 2px 10px; cursor: pointer; letter-spacing: .08em; }
   .diagbtn:hover { color: var(--accent); border-color: var(--accent); }
@@ -487,11 +488,19 @@ function bayHtml(a, i) {
     + '<div class="face back"><div class="board" onclick="toggle(\\'' + a.name + '\\')">' + boardHtml(a) + '</div></div>'
     + '</div></div>'
 }
+function channelInfo(rackKey) {
+  const racks = rackOrder()
+  const idx = Math.max(0, racks.indexOf(rackKey))
+  const pan = racks.length > 1 ? -0.8 + (1.6 * idx) / (racks.length - 1) : 0
+  const pos = pan < -0.2 ? 'L' : pan > 0.2 ? 'R' : 'C'
+  return '<span class="chinfo" style="color:' + rackColor(idx) + '">ch' + (idx + 1) + ' - ' + pos + ' - ' + RACK_WAVES[idx % RACK_WAVES.length] + '</span>'
+}
 function cabinetHtml(title, apps, slim, sys) {
-  const sub = sys
+  const rackKey = sys ? sys.name : null
+  const sub = (sys
     ? '<span class="cabinfo">system - ' + sys.members.length + ' members - ' + Object.keys(sys.wires ?? {}).length + ' wires</span>'
       + '<button class="diagbtn" onclick="openDiagram(\\'' + esc(sys.name) + '\\')">&#8909; diagram</button>'
-    : ''
+    : '') + channelInfo(rackKey)
   return '<div class="cabinet">'
     + '<div class="vents' + (slim ? ' slim' : '') + '"></div>'
     + '<div class="rack">' + apps.map((a, i) => bayHtml(a, i)).join('') + '</div>'
@@ -640,6 +649,27 @@ function rackOf(appName) {
   const sys = [...systemsCache].sort((a, b) => a.name.localeCompare(b.name)).find(s => s.members.includes(appName))
   return sys ? sys.name : null
 }
+function hueShift(hex, deg) {
+  const n = parseInt(hex.replace('#', ''), 16)
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255
+  const l = (max + min) / 2, d = max - min
+  let h = 0
+  const s2 = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1))
+  if (d) {
+    const rr = r / 255, gg = g / 255, bb = b / 255
+    h = max === rr ? ((gg - bb) / d) % 6 : max === gg ? (bb - rr) / d + 2 : (rr - gg) / d + 4
+    h *= 60
+  }
+  h = (h + deg + 360) % 360
+  const c = (1 - Math.abs(2 * l - 1)) * s2, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2
+  const [r2, g2, b2] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+  const to = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0')
+  return '#' + to(r2) + to(g2) + to(b2)
+}
+function rackColor(rackIdx) {
+  return hueShift(accentColor(), rackIdx * 42)
+}
 function rackChannel(appName) {
   const racks = rackOrder()
   const idx = Math.max(0, racks.indexOf(rackOf(appName)))
@@ -731,10 +761,11 @@ function drawViz() {
   }
   if (apps.length) {
     const bw = W / apps.length
-    const ac = accentColor()
     const now = Date.now() / 1000
     apps.forEach((a, i) => {
       const name = a.name
+      const rIdx = Math.max(0, rackOrder().indexOf(rackOf(name)))
+      const ac = rackColor(rIdx)
       let e = energy[name] ?? 0
       // idle shimmer so the deck breathes even in silence
       const shimmer = a.state === 'running' ? 0.03 + 0.02 * Math.sin(now * 1.7 + i * 1.3) : 0
@@ -754,9 +785,18 @@ function drawViz() {
       ctx.fillRect(x, Math.max(2, H - pk - 3), w, 2)
       energy[name] = e * 0.93
     })
-    // rack channel separators
-    ctx.fillStyle = '#26282e'
-    for (const b of bounds.slice(0, -1)) ctx.fillRect(b * bw - 1, 6, 1, H - 12)
+    // rack channel separators + labels
+    ctx.fillStyle = '#3a3d45'
+    for (const b of bounds.slice(0, -1)) ctx.fillRect(b * bw - 1, 4, 2, H - 8)
+    ctx.font = '8px ui-monospace'
+    let start = 0
+    racks.forEach((r, ri) => {
+      ctx.fillStyle = rackColor(ri)
+      ctx.globalAlpha = 0.85
+      ctx.fillText((r ?? 'slab') + ' - ch' + (ri + 1), start * bw + 5, 11)
+      ctx.globalAlpha = 1
+      start = bounds[ri]
+    })
   }
   requestAnimationFrame(drawViz)
 }
