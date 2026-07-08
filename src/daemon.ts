@@ -7,7 +7,7 @@ import { loadState, saveState, allocateHostPort, getSecrets, setSecrets, deleteS
 import { loadManifest, parseDuration } from './manifest'
 import { createProxy } from './proxy'
 import { createEngine } from './engine'
-import { dashboardHtml } from './dashboard'
+import { dashboardHtml, apiHumanHtml } from './dashboard'
 import { openTunnel, closeTunnel } from './tunnel'
 import { cloneOrPull, normalizeGitUrl, repoDirName } from './git'
 
@@ -60,8 +60,15 @@ async function main(): Promise<void> {
     return (reqTimes.get(name) ?? []).filter((t) => now - t < 60_000).length
   }
 
-  api.get('/v1/apps', wrap(async (_req, res) => {
-    res.json({ apps: Object.values(state.apps).map((a) => ({ ...a, reqPerMin: reqPerMin(a.name) })) })
+  api.get('/v1/apps', wrap(async (req, res) => {
+    const payload = { apps: Object.values(state.apps).map((a) => ({ ...a, reqPerMin: reqPerMin(a.name) })) }
+    // Content negotiation: browsers get a readable view, machines get JSON
+    if ((req.headers.accept ?? '').includes('text/html')) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.send(apiHumanHtml('/v1/apps', payload))
+      return
+    }
+    res.json(payload)
   }))
 
   api.post('/v1/apps', wrap(async (req, res) => {
@@ -212,8 +219,14 @@ async function main(): Promise<void> {
     res.json({ keys: Object.keys(getSecrets(record.name)) })
   }))
 
-  api.get('/v1/health', wrap(async (_req, res) => {
-    res.json({ status: 'ok', apps: Object.keys(state.apps).length, proxyPort: PROXY_PORT })
+  api.get('/v1/health', wrap(async (req, res) => {
+    const payload = { status: 'ok', apps: Object.keys(state.apps).length, proxyPort: PROXY_PORT }
+    if ((req.headers.accept ?? '').includes('text/html')) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.send(apiHumanHtml('/v1/health', payload))
+      return
+    }
+    res.json(payload)
   }))
 
   api.get('/', (_req, res) => {

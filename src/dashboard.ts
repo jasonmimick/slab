@@ -14,14 +14,15 @@ export function dashboardHtml(proxyPort: number): string {
     --bg: #131418; --rail: #0d0e11;
     --unit-hi: #26282f; --unit-lo: #1b1d22; --edge: #33363e; --groove: #0a0b0d;
     --text: #ece9e2; --dim: #9a9da5; --faint: #5f626a;
-    --amber: #ffb454; --green: #71d68d; --red: #f07f78; --blue: #82b8e8;
-    --board: #14170f; --trace: rgba(255,180,84,.28);
+    --accent: #ffb454;
+    --amber: var(--accent); --green: #71d68d; --red: #f07f78; --blue: #82b8e8;
+    --board: #14170f; --trace: color-mix(in srgb, var(--accent) 28%, transparent);
   }
   * { box-sizing: border-box; margin: 0; }
   body {
     font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
     background:
-      radial-gradient(1200px 500px at 50% -10%, rgba(255,180,84,.05), transparent 60%),
+      radial-gradient(1200px 500px at 50% -10%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 60%),
       var(--bg);
     color: var(--text); min-height: 100vh;
     padding: clamp(20px, 4vw, 56px);
@@ -37,28 +38,21 @@ export function dashboardHtml(proxyPort: number): string {
   .stat b em { font-style: normal; color: var(--faint); font-size: 13px; }
 
   .layout { display: grid; grid-template-columns: 46px 1fr; gap: 16px; align-items: start; }
-  .spine { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 24px; }
+  .spine { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 24px; z-index: 20; }
   .spine span {
-    display: grid; place-items: center; width: 46px; height: 46px;
-    background: linear-gradient(180deg, var(--unit-hi), var(--unit-lo));
-    border: 1px solid var(--edge); border-radius: 6px;
-    font-weight: 800; font-size: 21px; cursor: pointer; position: relative;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 3px 8px rgba(0,0,0,.45);
-    transition: transform .12s ease, border-color .12s ease;
+    display: grid; place-items: center; width: 46px; height: 44px;
+    font-weight: 800; font-size: 24px; cursor: pointer; position: relative;
+    color: var(--faint); text-shadow: 0 1px 0 rgba(0,0,0,.6);
+    transition: color .12s ease, transform .12s ease;
   }
-  .spine span:hover { transform: translateX(2px); border-color: var(--amber); }
+  .spine span:hover { color: var(--accent); transform: translateX(2px); }
   .spine span:hover::after {
-    content: attr(data-nav); position: absolute; left: 54px; white-space: nowrap;
-    font-size: 9px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase;
-    color: var(--amber); background: rgba(10,11,13,.95); border: 1px solid var(--edge);
-    padding: 3px 8px; border-radius: 4px; z-index: 5;
+    content: attr(data-nav); position: absolute; left: 52px; top: 50%; transform: translateY(-50%);
+    white-space: nowrap; font-size: 9px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--accent); background: rgba(10,11,13,.97); border: 1px solid var(--edge);
+    padding: 3px 8px; border-radius: 4px; z-index: 30;
   }
-  .spine span:first-child {
-    background: linear-gradient(180deg, #ffc36e, #f0a13e); color: #2a1e08; border-color: #b97f2e;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 3px 10px rgba(240,161,62,.25);
-  }
-  .spine .vent { height: 46px; border-radius: 6px; border: 1px solid var(--groove);
-    background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.5) 3px 5px); opacity: .5; }
+  .spine span:first-child { color: var(--accent); }
 
   /* cabinet: matte monolith with scattered vent perforations (oxide-style) */
   .cabinet {
@@ -163,6 +157,7 @@ export function dashboardHtml(proxyPort: number): string {
   .meter .rpm.hot { color: var(--text); }
   .meter .rpm small { font-size: 10px; color: var(--faint); font-weight: 500; margin-left: 2px; }
   .meter svg { display: block; margin: 4px 0 0 auto; opacity: .9; }
+  .meter svg path { stroke: var(--accent); }
 
   .acts { display: flex; flex-direction: column; gap: 6px; opacity: 0; transition: opacity .15s; }
   .bay:hover .acts, .acts:focus-within { opacity: 1; }
@@ -173,7 +168,7 @@ export function dashboardHtml(proxyPort: number): string {
   }
   button:hover { color: var(--text); border-color: var(--faint); }
   button.warn:hover { color: var(--red); border-color: var(--red); }
-  button.hot { border-color: rgba(255,180,84,.5); color: var(--amber); }
+  button.hot { border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
   button.hot:hover { border-color: var(--amber); }
 
   /* back face: the board inside */
@@ -208,7 +203,11 @@ export function dashboardHtml(proxyPort: number): string {
 
   .empty { border: 1px dashed var(--edge); border-radius: 7px; padding: 44px; text-align: center; color: var(--faint); }
   .empty code { color: var(--amber); }
-  footer { color: var(--faint); font-size: 11px; margin-top: 18px; display: flex; justify-content: space-between; }
+  footer { color: var(--faint); font-size: 11px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .theme { display: flex; align-items: center; gap: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: .14em; font-size: 9px; }
+  .theme input { width: 22px; height: 22px; border: 1px solid var(--edge); border-radius: 50%; background: none; padding: 0; cursor: pointer; }
+  .theme input::-webkit-color-swatch-wrapper { padding: 2px; }
+  .theme input::-webkit-color-swatch { border: none; border-radius: 50%; }
 
   #drawer {
     position: fixed; left: 0; right: 0; bottom: 0; max-height: 46vh; display: none;
@@ -247,7 +246,6 @@ export function dashboardHtml(proxyPort: number): string {
     <span data-nav="logs" onclick="navLogs()">L</span>
     <span data-nav="api — raw json" onclick="window.open('/v1/apps')">A</span>
     <span data-nav="boards — flip all" onclick="navBoards()">B</span>
-    <div class="vent"></div><div class="vent"></div>
   </div>
   <div class="cabinet">
     <div class="vents"></div>
@@ -257,6 +255,7 @@ export function dashboardHtml(proxyPort: number): string {
 </div>
 <footer>
   <span>ingress :${proxyPort} · api :7766</span>
+  <label class="theme">accent <input type="color" id="accent" value="#ffb454"></label>
   <span id="clock"></span>
 </footer>
 </div>
@@ -309,7 +308,7 @@ function spark(name) {
   const step = w / (pts.length - 1)
   const path = pts.map((v, i) => (i ? 'L' : 'M') + (i * step).toFixed(1) + ' ' + (h - 2 - (v / max) * (h - 4)).toFixed(1)).join(' ')
   return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">'
-    + '<path d="' + path + '" fill="none" stroke="#ffb454" stroke-width="1.5" stroke-linecap="round"/></svg>'
+    + '<path d="' + path + '" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>'
 }
 function chip(lbl, val, amber) {
   return '<div class="chip"><div class="lbl">' + lbl + '</div><div class="val' + (amber ? ' amber' : '') + '">' + val + '</div></div>'
@@ -414,6 +413,16 @@ function navBoards() {
 function tick() {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString()
 }
+const accentInput = document.getElementById('accent')
+const savedAccent = localStorage.getItem('slab-accent')
+if (savedAccent) {
+  document.documentElement.style.setProperty('--accent', savedAccent)
+  accentInput.value = savedAccent
+}
+accentInput.addEventListener('input', () => {
+  document.documentElement.style.setProperty('--accent', accentInput.value)
+  localStorage.setItem('slab-accent', accentInput.value)
+})
 load()
 tick()
 setInterval(load, 5000)
@@ -421,4 +430,42 @@ setInterval(tick, 1000)
 </script>
 </body>
 </html>`
+}
+
+// Human view of API endpoints: same URL as the JSON, selected by Accept header.
+// Browsers send Accept: text/html; agents and curl don't — so /v1/* serves both
+// audiences without separate routes.
+export function apiHumanHtml(path: string, data: unknown): string {
+  const routes = [
+    ['GET', '/v1/apps', 'all apps (+reqPerMin)'],
+    ['POST', '/v1/apps', '{ sourceDir } | { gitUrl }'],
+    ['GET', '/v1/apps/:name', 'one app'],
+    ['DELETE', '/v1/apps/:name', 'remove app'],
+    ['POST', '/v1/apps/:name/deploy', 'build + run'],
+    ['POST', '/v1/apps/:name/stop', 'stop container'],
+    ['POST', '/v1/apps/:name/start', 'start container'],
+    ['GET', '/v1/apps/:name/logs?tail=100', 'recent logs'],
+    ['PUT', '/v1/apps/:name/secrets', '{ values: {K:V} }'],
+    ['GET', '/v1/apps/:name/secrets', 'secret names'],
+    ['POST', '/v1/apps/:name/expose', 'public tunnel url'],
+    ['POST', '/v1/apps/:name/hide', 'close tunnel'],
+    ['GET', '/v1/health', 'daemon status'],
+  ]
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>slab api — ${path}</title>
+<style>
+  body { font: 13px/1.6 ui-monospace, Menlo, monospace; background: #131418; color: #ece9e2; padding: 40px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 13px; color: #ffb454; letter-spacing: .1em; margin-bottom: 4px; }
+  .note { color: #5f626a; font-size: 11px; margin-bottom: 22px; }
+  pre { background: #0b0c0e; border: 1px solid #2c2f36; border-radius: 8px; padding: 16px; overflow: auto; font-size: 12px; margin-bottom: 26px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td { padding: 5px 14px 5px 0; border-bottom: 1px solid #1c1e24; color: #9a9da5; }
+  td:first-child { color: #82b8e8; width: 60px; }
+  td:nth-child(2) { color: #ece9e2; }
+  a { color: #82b8e8; }
+</style></head><body>
+<h1>slab api — ${path}</h1>
+<div class="note">You're seeing HTML because your client sent <b>Accept: text/html</b>. Agents and curl get raw JSON from the same URL. Dashboard: <a href="/">/</a></div>
+<pre>${JSON.stringify(data, null, 2).replace(/</g, '&lt;')}</pre>
+<table>${routes.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</table>
+</body></html>`
 }
