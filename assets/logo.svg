@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 190" role="img" aria-label="slab — a concrete slab, the foundation">
+  <title>slab — the localhost hyperscaler</title>
+  <!-- an isometric concrete slab: the foundation everything runs on.
+       top: poured concrete with aggregate speckle
+       side: two cast grooves (rack units live here)
+       edge: one amber power LED — the rack is alive -->
+
+  <!-- shadow it sits on -->
+  <ellipse cx="120" cy="158" rx="112" ry="22" fill="#000000" opacity="0.14"/>
+
+  <!-- top face -->
+  <polygon points="120,26 224,78 120,130 16,78" fill="#cfccc4"/>
+  <!-- left face -->
+  <polygon points="16,78 120,130 120,164 16,112" fill="#9b9890"/>
+  <!-- right face -->
+  <polygon points="224,78 120,130 120,164 224,112" fill="#7a776f"/>
+
+  <!-- crisp top edges -->
+  <polygon points="120,26 224,78 120,130 16,78" fill="none" stroke="#5f5c55" stroke-width="1.5" stroke-linejoin="round" opacity="0.55"/>
+  <path d="M16 78 L16 112 L120 164 L224 112 L224 78" fill="none" stroke="#55524b" stroke-width="1.5" stroke-linejoin="round" opacity="0.5"/>
+  <path d="M120 130 L120 164" stroke="#55524b" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- aggregate speckle on the pour -->
+  <g fill="#b7b4ac">
+    <circle cx="92" cy="62" r="1.6"/><circle cx="141" cy="55" r="1.3"/>
+    <circle cx="172" cy="79" r="1.7"/><circle cx="118" cy="92" r="1.4"/>
+    <circle cx="66" cy="83" r="1.5"/><circle cx="150" cy="101" r="1.5"/>
+    <circle cx="98" cy="112" r="1.2"/><circle cx="190" cy="93" r="1.2"/>
+  </g>
+  <g fill="#e2dfd7">
+    <circle cx="108" cy="49" r="1.3"/><circle cx="160" cy="68" r="1.4"/>
+    <circle cx="80" cy="95" r="1.3"/><circle cx="132" cy="78" r="1.2"/>
+    <circle cx="54" cy="74" r="1.1"/><circle cx="178" cy="105" r="1.1"/>
+  </g>
+  <!-- a hairline crack, honestly concrete -->
+  <path d="M44 74 l14 5 l-4 6 l16 6" fill="none" stroke="#8f8c84" stroke-width="1" opacity="0.5" stroke-linecap="round"/>
+
+  <!-- cast grooves on the left face (rack units in the foundation) -->
+  <path d="M24 96 L112 140" stroke="#6e6b64" stroke-width="2.5" opacity="0.65" stroke-linecap="round"/>
+  <path d="M24 104 L112 148" stroke="#6e6b64" stroke-width="2.5" opacity="0.65" stroke-linecap="round"/>
+
+  <!-- the power LED, breathing -->
+  <circle cx="198" cy="106" r="9" fill="#ffb454" opacity="0.22">
+    <animate attributeName="opacity" values="0.22;0.08;0.22" dur="2.8s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="198" cy="106" r="4" fill="#ffb454">
+    <animate attributeName="opacity" values="1;0.55;1" dur="2.8s" repeatCount="indefinite"/>
+  </circle>
+</svg>

@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.svg" width="170" alt="slab — a concrete slab: the foundation">
+
 # slab
 
 **the localhost hyperscaler**
@@ -13,16 +15,16 @@ dashboard, or AI agents speaking MCP.
 </div>
 
 ```text
- ┌─────────────────────────────────────────────────────────────┐
- │  ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒                              vents  │
- │ ┌───────────────────────────────────────────────────┐       │
- │ │ U01 ⏻ ▮▮▮▮▮▯▯▯  lake-api    ● running   042 req/m │  VU ◔ │
- │ │ U02 ⏻ ▮▮▯▯▯▯▯▯  feeder      ◐ sleeping  — wakes on hit    │
- │ │ U03 ⏻ ▮▮▮▮▮▮▮▯  scoreboard  🔒 private — system-only      │
- │ └───────────────────────────────────────────────────┘       │
- │  arcade_  ·  system — 3 members — 2 wires  ·  ch2 - C - sine │
- └─────────────────────────────────────────────────────────────┘
-        every app a rack unit · flip it open to see the board
+┌────────────────────────────────────────────────────────────────┐
+│  ▘▝▘▝▘▝▘▝▘▝▘▝▘▝▘▝▘▝▘▝▘▝▘▝▘▝                                    │
+│ ┌────────────────────────────────────────────────────────────┐ │
+│ │ U01 ◉ ▮▮▮▮▮▯▯▯  lake-api    ● running      042 req/m       │ │
+│ │ U02 ◉ ▮▮▯▯▯▯▯▯  feeder      ◐ sleeping  wakes-on-hit       │ │
+│ │ U03 ◉ ▮▮▮▮▮▮▮▯  scoreboard  ○ private    system-only       │ │
+│ └────────────────────────────────────────────────────────────┘ │
+│  arcade_     system · 3 members · 2 wires      ch2 · C · sine  │
+└────────────────────────────────────────────────────────────────┘
+      every app a rack unit · flip it open to see the board
 ```
 
 ## Install
