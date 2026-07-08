@@ -8,7 +8,7 @@ const NAME_RE = /^[a-z][a-z0-9-]{1,30}$/
 export function loadManifest(sourceDir: string): Manifest {
   const file = path.join(sourceDir, 'slab.toml')
   if (!fs.existsSync(file)) {
-    throw new Error(`No slab.toml found in ${sourceDir}`)
+    return inferManifest(sourceDir)
   }
   const raw = parse(fs.readFileSync(file, 'utf-8')) as Record<string, unknown>
 
@@ -38,6 +38,38 @@ export function loadManifest(sourceDir: string): Manifest {
     env: typeof raw.env === 'object' && raw.env !== null
       ? Object.fromEntries(Object.entries(raw.env as Record<string, unknown>).map(([k, v]) => [k, String(v)]))
       : {},
+  }
+}
+
+function sanitizeName(raw: string): string {
+  let name = raw.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '')
+  if (!/^[a-z]/.test(name)) name = `app-${name}`
+  name = name.slice(0, 31)
+  while (name.length < 2) name += '0'
+  return NAME_RE.test(name) ? name : 'app'
+}
+
+// No slab.toml? Any repo with a Dockerfile can still run: name from the
+// directory (for git sources that's the repo name), type service, port from
+// the Dockerfile's first EXPOSE (default 3000). PORT is injected so apps
+// that read it listen where slab expects.
+function inferManifest(sourceDir: string): Manifest {
+  const dockerfile = path.join(sourceDir, 'Dockerfile')
+  if (!fs.existsSync(dockerfile)) {
+    throw new Error(`No slab.toml found in ${sourceDir} — and no Dockerfile to infer an app from. Add a slab.toml (slab init) or a Dockerfile.`)
+  }
+  const expose = /^\s*EXPOSE\s+(\d+)/im.exec(fs.readFileSync(dockerfile, 'utf-8'))
+  const port = expose ? Number(expose[1]) : 3000
+  return {
+    name: sanitizeName(path.basename(sourceDir)),
+    type: 'service',
+    port,
+    public: true,
+    image: undefined,
+    postgres: false,
+    secrets: [],
+    idle_timeout: '5m',
+    env: { PORT: String(port) },
   }
 }
 

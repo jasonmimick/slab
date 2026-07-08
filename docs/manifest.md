@@ -5,6 +5,20 @@ plus, unless `image` is set, a `Dockerfile`. This is the full field list, as
 enforced by `loadManifest` in `src/manifest.ts` against the `Manifest`
 interface in `src/types.ts`.
 
+## no slab.toml? inference
+
+`slab.toml` is optional when the directory has a `Dockerfile` — any random
+GitHub repo deploys as-is: `slab deploy https://github.com/docker/welcome-to-docker`.
+slab infers a manifest:
+
+- `name` — the directory / repo name, sanitized to the name rules
+- `type` — `service`
+- `port` — the Dockerfile's first `EXPOSE`, else `3000`; `PORT` is injected
+  as an env var so apps that read it listen where slab expects
+
+Add a real `slab.toml` (`slab init`) whenever you need anything beyond the
+defaults (functions, postgres, secrets, private members).
+
 ## `name` (required)
 
 ```toml
