@@ -114,6 +114,10 @@
   .try-row a { border-radius: 6px; }
   .try-row a:hover { box-shadow: 0 0 0 2px var(--amber); text-decoration: none; }
   .try-row span { color: var(--faint); font-size: 11px; max-width: 34ch; }
+  .aws-pill { display: inline-flex; align-items: center; height: 26px; padding: 0 14px;
+    border: 1px solid var(--amber); border-radius: 6px; color: var(--amber);
+    font-size: 11.5px; letter-spacing: .04em; }
+  .aws-pill:hover { background: rgba(255,180,84,.1); text-decoration: none; box-shadow: 0 0 0 1px var(--amber); }
 
   /* ── the cabinet: the product, not a picture of it ── */
   .cabinet { background: linear-gradient(180deg, #101114, #0c0d10);
@@ -291,8 +295,14 @@
       <code id="cmd">curl -fsSL https://raw.githubusercontent.com/jasonmimick/slab/master/install.sh | bash</code>
       <button onclick="copyCmd(this)" aria-label="copy install command">copy</button>
     </div>
-    <p class="after-install">needs docker · node ≥ 20 · git — the installer checks, and tells you the exact fix ·
-    or <a href="https://codespaces.new/jasonmimick/slab?quickstart=1">try it in a codespace</a>, zero install</p>
+    <p class="after-install">needs docker · node ≥ 20 · git — the installer checks, and tells you the exact fix</p>
+    <div class="try-row">
+      <a href="https://codespaces.new/jasonmimick/slab?quickstart=1" title="zero install — the daemon boots, the rack seeds itself, the dashboard opens">
+        <img src="https://github.com/codespaces/badge.svg" alt="Open in GitHub Codespaces" height="26">
+      </a>
+      <a class="aws-pill" href="https://github.com/jasonmimick/slab/blob/master/docs/providers/aws.md"
+         title="slab deploy --target aws — Fargate in your own account, no stored keys">deploy to aws ↗</a>
+    </div>
   </div>
 
   <div>
