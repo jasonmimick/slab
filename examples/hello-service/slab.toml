@@ -1,0 +1,7 @@
+# Demo: build from a Dockerfile (no "image" key) + an always-on service.
+name = "hello-service"
+type = "service"
+port = 3000
+
+[env]
+GREETING = "hello from slab"

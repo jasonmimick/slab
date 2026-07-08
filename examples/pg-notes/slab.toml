@@ -1,0 +1,10 @@
+# Demo: postgres = true (slab provisions a DB and injects DATABASE_URL) +
+# scale-to-zero (idle_timeout). The postgres container itself is shared and
+# always-on — only this app's container sleeps. Notes written before it went
+# to sleep are still there on the next request, because the data lives in
+# postgres, not in the app container.
+name = "pg-notes"
+type = "function"
+port = 3000
+postgres = true
+idle_timeout = "3m"
