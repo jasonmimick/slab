@@ -84,7 +84,30 @@ const program = new Command()
 program.name('slab').description('tiny local paas').version('1.0.0')
 program.option('-N, --node <name>', 'target a peer node instead of the local daemon (see: slab peer ls)')
 
+// Self-starting daemon: any command that needs the local daemon boots it
+// when it isn't running (detached, logs to ~/.slab/daemon.log). No more
+// "start it with: slab daemon" dead ends — critical for codespaces/demos
+// where the daemon dies with the sandbox.
+const NO_DAEMON_NEEDED = new Set(['daemon', 'init', 'upgrade'])
+async function ensureDaemon(): Promise<void> {
+  if (process.env.SLAB_DAEMON_URL) return   // explicitly pointed elsewhere — don't self-start
+  try { await client.health(); return } catch { /* boot it */ }
+  console.error('daemon not running — starting it…')
+  const out = fs.openSync(path.join(slabDir(), 'daemon.log'), 'a')
+  spawn(process.execPath, [path.join(__dirname, 'daemon.js')], {
+    detached: true,
+    stdio: ['ignore', out, out],
+  }).unref()
+  for (let i = 0; i < 40; i++) {
+    try { await client.health(); console.error('daemon up.'); return } catch { await new Promise((r) => setTimeout(r, 500)) }
+  }
+  throw new Error(`daemon did not come up — check ${path.join(slabDir(), 'daemon.log')}`)
+}
+
 program.hook('preAction', async (_thisCommand, actionCommand) => {
+  if (!NO_DAEMON_NEEDED.has(actionCommand.name())) {
+    try { await ensureDaemon() } catch (err) { fail(err) }
+  }
   const target = program.opts().node as string | undefined
   if (!target) return
   if (LOCAL_ONLY.has(actionCommand.name())) {
