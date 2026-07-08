@@ -8,10 +8,11 @@ daemon binds `SLAB_BIND` (default `127.0.0.1`) on port `SLAB_PORT`
 ## auth
 
 Loopback requests are always trusted. Non-loopback requests (a daemon bound
-to `0.0.0.0` on a LAN/tailnet) require `Authorization: Bearer $SLAB_TOKEN`,
-or `?token=$SLAB_TOKEN` as a query param — the dashboard uses the latter
-for remote viewing: open `http://<node>:7766/?token=...` once and the token
-moves to the browser's localStorage and off the URL. With no `SLAB_TOKEN`
+to `0.0.0.0` on a LAN/tailnet — `slab node open`) require
+`Authorization: Bearer $SLAB_TOKEN`, or `?token=$SLAB_TOKEN` once — the
+daemon answers that with an HttpOnly session cookie (port-scoped,
+`slab_token_<port>`), so browser refreshes and navigation keep working
+after the dashboard strips the token from the URL. With no `SLAB_TOKEN`
 set, non-loopback requests are always rejected.
 
 All request and response bodies are JSON. Every error response is

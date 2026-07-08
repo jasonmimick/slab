@@ -419,16 +419,35 @@ async function main(): Promise<void> {
   // else must present this node's SLAB_TOKEN. With no token set, the daemon
   // is loopback-only in practice even when SLAB_BIND opens it up.
   const AUTH_TOKEN = nodeCfg.token
+  // Cookie name is port-scoped: cookies ignore ports, and two daemons on one
+  // host (same-machine cluster) must not clobber each other's session.
+  const AUTH_COOKIE = `slab_token_${DAEMON_PORT}`
+  function cookieToken(req: Request): string | null {
+    const raw = req.headers.cookie
+    if (!raw) return null
+    for (const part of raw.split(';')) {
+      const eq = part.indexOf('=')
+      if (eq > 0 && part.slice(0, eq).trim() === AUTH_COOKIE) {
+        return decodeURIComponent(part.slice(eq + 1).trim())
+      }
+    }
+    return null
+  }
   api.use((req, res, next) => {
     const ip = req.socket.remoteAddress ?? ''
     const loopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
     if (loopback) { next(); return }
     if (AUTH_TOKEN && req.headers.authorization === `Bearer ${AUTH_TOKEN}`) { next(); return }
-    // browsers can't set headers on page loads / EventSource — accept the
-    // token as a query param too (the dashboard moves it to localStorage
-    // and strips it from the URL immediately)
-    if (AUTH_TOKEN && req.query.token === AUTH_TOKEN) { next(); return }
-    res.status(401).json({ error: 'unauthorized — non-loopback requests require Authorization: Bearer $SLAB_TOKEN (or ?token=...)' })
+    if (AUTH_TOKEN && cookieToken(req) === AUTH_TOKEN) { next(); return }
+    // Browsers can't set headers on page loads / EventSource — accept the
+    // token as a query param once, then hand back an HttpOnly cookie so
+    // plain refreshes keep working after the dashboard strips the URL.
+    if (AUTH_TOKEN && req.query.token === AUTH_TOKEN) {
+      res.setHeader('Set-Cookie', `${AUTH_COOKIE}=${encodeURIComponent(AUTH_TOKEN)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`)
+      next()
+      return
+    }
+    res.status(401).json({ error: 'unauthorized — non-loopback requests require Authorization: Bearer $SLAB_TOKEN (or open /?token=... once)' })
   })
 
   // Rolling 60s of request timestamps per app — powers the req/min column
