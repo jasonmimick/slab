@@ -341,7 +341,7 @@ export function createEngine(): Engine {
     return info ? docker.getContainer(info.Id) : null
   }
 
-  async function runJob(job: JobRecord, imageTag: string): Promise<string> {
+  async function runJob(job: JobRecord, imageTag: string, networks?: string[]): Promise<string> {
     // A crashed prior daemon could have left a container for this id behind
     const stale = await findContainerByLabel(`slab.job=${job.id}`)
     if (stale) await docker.getContainer(stale.Id).remove({ force: true }).catch(() => { /* best-effort */ })
@@ -363,6 +363,18 @@ export function createEngine(): Engine {
       })
     } catch (err) {
       throw new Error(`failed to create container for job ${job.id}: ${errMsg(err)}`)
+    }
+    // Join system networks BEFORE start — the command runs the instant the
+    // container starts, and a fast job would race the DNS setup otherwise.
+    for (const net of networks ?? []) {
+      try {
+        await docker.getNetwork(net).connect({ Container: container.id })
+      } catch (err) {
+        if (!isNetworkConflict(err)) {
+          await container.remove({ force: true }).catch(() => { /* best-effort cleanup */ })
+          throw new Error(`failed to join job ${job.id} to network ${net}: ${errMsg(err)}`)
+        }
+      }
     }
     try {
       await container.start()

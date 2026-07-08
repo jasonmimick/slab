@@ -330,8 +330,19 @@ export function dashboardHtml(proxyPort: number): string {
   #bench-panel .board { min-height: 0; cursor: default; padding: 12px; }
   #bench-panel .board::after { content: none; }
   #bench-panel .pwires { margin-top: 12px; font-size: 11px; }
-  #bench-panel .pwires .w { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); color: var(--dim); }
+  #bench-panel .pwires .w { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); color: var(--dim); align-items: center; }
   #bench-panel .pwires .w b { color: var(--accent); font-weight: 500; }
+  #bench-panel .pwires .w span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .unpatch { margin-left: auto; padding: 0 6px; font-size: 10px; flex-shrink: 0; }
+  .pnote { color: var(--faint); font-size: 10px; margin-top: 10px; word-break: break-all; }
+  .patchrow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .patchrow select, .patchrow input {
+    background: var(--drawer-bg); border: 1px solid var(--edge); color: var(--text);
+    border-radius: 4px; padding: 4px 8px; font: inherit; font-size: 11px;
+  }
+  .patchrow input { width: 128px; }
+  .patchrow select:focus, .patchrow input:focus { outline: none; border-color: var(--accent); }
+  .patchrow .errmsg { flex-basis: 100%; }
   @media (max-width: 900px) { .bench-body { grid-template-columns: 1fr; } }
 
   /* monitor deck: spectrum analyzer + listen knob (a component above the cabinets) */
@@ -539,10 +550,20 @@ export function dashboardHtml(proxyPort: number): string {
   body.overview #newbay { display: none; }
   #newbay .nb-closed { padding: 14px 22px; cursor: pointer; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
   #newbay .nb-closed:hover { color: var(--accent); }
-  #newbay .nb-form { display: none; padding: 14px 22px; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #newbay .nb-body { display: none; padding: 12px 22px 14px; }
   #newbay.open .nb-closed { display: none; }
   #newbay.open { border-color: var(--accent); }
-  #newbay.open .nb-form { display: flex; }
+  #newbay.open .nb-body { display: block; }
+  .nb-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .nb-tabs button.active { color: var(--accent); border-color: var(--accent); }
+  .nb-tabs .nb-cancel { margin-left: auto; }
+  #newbay .nb-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .nbs-members { display: flex; gap: 8px; flex-wrap: wrap; flex-basis: 100%; }
+  .nbs-members label { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--dim);
+    border: 1px solid var(--edge); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
+  .nbs-members label:has(input:checked) { color: var(--accent); border-color: var(--accent); }
+  .nbs-members input { accent-color: var(--accent); }
+  .nbs-members .nbs-note { color: var(--faint); font-size: 11px; align-self: center; }
   #newbay input {
     flex: 1; min-width: 260px; font: inherit; color: var(--text);
     background: var(--drawer-bg); border: 1px solid var(--edge); border-radius: 5px; padding: 7px 12px;
@@ -621,13 +642,25 @@ export function dashboardHtml(proxyPort: number): string {
 <div class="layout">
   <div id="cabinets"></div>
   <div id="newbay">
-    <div class="nb-closed" onclick="bayOpen()">&#8853; empty bay — mount a unit</div>
-    <form class="nb-form" onsubmit="baySubmit(event)">
-      <input id="nb-input" placeholder="github url · owner/repo · /absolute/path" spellcheck="false" autocomplete="off">
-      <button type="submit" class="hot">mount + deploy</button>
-      <button type="button" onclick="bayClose()">cancel</button>
-      <div class="errmsg" id="nb-err"></div>
-    </form>
+    <div class="nb-closed" onclick="bayOpen()">&#8853; empty bay — mount a unit · rack up a system</div>
+    <div class="nb-body">
+      <div class="nb-tabs">
+        <button type="button" id="nbt-unit" class="active" onclick="bayTab('unit')">unit</button>
+        <button type="button" id="nbt-system" onclick="bayTab('system')">system</button>
+        <button type="button" class="nb-cancel" onclick="bayClose()">cancel</button>
+      </div>
+      <form class="nb-form" id="nb-unit" onsubmit="baySubmit(event)">
+        <input id="nb-input" placeholder="github url · owner/repo · /absolute/path" spellcheck="false" autocomplete="off">
+        <button type="submit" class="hot">mount + deploy</button>
+        <div class="errmsg" id="nb-err"></div>
+      </form>
+      <form class="nb-form" id="nb-system" style="display:none" onsubmit="baySystemSubmit(event)">
+        <input id="nbs-name" placeholder="system name" spellcheck="false" autocomplete="off" style="flex:0 1 200px">
+        <div class="nbs-members" id="nbs-members"></div>
+        <button type="submit" class="hot">rack up + deploy</button>
+        <div class="errmsg" id="nbs-err"></div>
+      </form>
+    </div>
   </div>
   <div id="overview"></div>
 </div>
@@ -705,15 +738,53 @@ fetch('/v1/health').then(r => r.json()).then(h => {
   if (h.node) document.getElementById('nodetag').textContent = '◆ ' + h.node
 }).catch(() => {})
 
-// ── empty bay: mount a unit straight from the rack ───────────────────────────
+// ── empty bay: mount a unit / rack up a system, straight from the rack ───────
 function bayOpen() {
   document.getElementById('newbay').classList.add('open')
+  // system tab: offer every app not already in a system
+  const solo = appsCache.filter(a => !systemsCache.some(s => s.members.includes(a.name)))
+  document.getElementById('nbs-members').innerHTML = solo.length
+    ? solo.map(a => '<label><input type="checkbox" value="' + esc(a.name) + '">' + esc(a.name) + '</label>').join('')
+    : '<span class="nbs-note">every app is already in a system — mount more units first</span>'
   document.getElementById('nb-input').focus()
+}
+function bayTab(which) {
+  document.getElementById('nb-unit').style.display = which === 'unit' ? 'flex' : 'none'
+  document.getElementById('nb-system').style.display = which === 'system' ? 'flex' : 'none'
+  document.getElementById('nbt-unit').classList.toggle('active', which === 'unit')
+  document.getElementById('nbt-system').classList.toggle('active', which === 'system')
+  if (which === 'unit') document.getElementById('nb-input').focus()
+  else document.getElementById('nbs-name').focus()
 }
 function bayClose() {
   document.getElementById('newbay').classList.remove('open')
   document.getElementById('nb-err').textContent = ''
+  document.getElementById('nbs-err').textContent = ''
   document.getElementById('nb-input').value = ''
+  document.getElementById('nbs-name').value = ''
+}
+async function baySystemSubmit(e) {
+  e.preventDefault()
+  const err = document.getElementById('nbs-err')
+  const name = document.getElementById('nbs-name').value.trim()
+  const picked = [...document.querySelectorAll('#nbs-members input:checked')].map(i => i.value)
+  err.textContent = ''
+  if (!name) { err.textContent = 'give the system a name'; return }
+  if (!picked.length) { err.textContent = 'pick at least one member'; return }
+  const apps = {}
+  for (const n of picked) {
+    const a = appsCache.find(x => x.name === n)
+    apps[n] = { source: a.gitUrl ?? a.sourceDir }
+  }
+  const r = await fetch('/v1/systems', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ manifest: { name, apps, wires: {} } }),
+  })
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok) { err.textContent = d.error ?? ('failed (' + r.status + ')'); return }
+  fetch('/v1/systems/' + name + '/deploy', { method: 'POST' }).catch(() => {})
+  bayClose()
+  load()
 }
 async function baySubmit(e) {
   e.preventDefault()
@@ -922,7 +993,7 @@ function cabinetHtml(title, apps, slim, sys) {
   const rackKey = sys ? sys.name : null
   const cabId = 'cab-' + (sys ? sys.name : 'slab')
   const sub = (sys
-    ? '<span class="cabinfo">system - ' + sys.members.length + ' members - ' + Object.keys(sys.wires ?? {}).length + ' wires</span>'
+    ? '<span class="cabinfo">' + slabType(sys) + ' slab - ' + sys.members.length + ' members - ' + Object.keys(sys.wires ?? {}).length + ' wires</span>'
       + '<button class="diagbtn" onclick="openDiagram(\\'' + esc(sys.name) + '\\')">&#8909; diagram</button>'
     : '') + channelInfo(rackKey)
   return '<div class="cabinet" id="' + cabId + '">'
@@ -1065,6 +1136,27 @@ function navBoards() {
   render()
 }
 
+// Construction taxonomy — how the system carries load:
+//   flat: members rest directly on the ingress, no beams (no wires)
+//   one-way: loads travel one direction (wire graph has no mutual edges)
+//   two-way: bending in all directions (some pair calls both ways)
+//   waffle: grid across nodes, utilities (trunks) concealed in the voids
+function slabType(sys) {
+  if (Object.values(sys.memberNodes ?? {}).some(n => !!n)) return 'waffle'
+  const entries = Object.entries(sys.wires ?? {})
+  if (!entries.length) return 'flat'
+  const edges = new Set()
+  for (const [k, v] of entries) {
+    const caller = k.split('.')[0]
+    const callee = sys.members.find(m => m !== caller && new RegExp('(^|[^a-z0-9-])' + m + '($|[^a-z0-9-])', 'i').test(v))
+    if (callee) edges.add(caller + '>' + callee)
+  }
+  for (const e of edges) {
+    const [a, b] = e.split('>')
+    if (edges.has(b + '>' + a)) return 'two-way'
+  }
+  return 'one-way'
+}
 function nodeColor(a) {
   return a && a.state === 'running' ? '#71d68d' : a && a.state === 'sleeping' ? '#82b8e8' : a && a.state === 'error' ? '#f07f78' : '#5f626a'
 }
@@ -1383,7 +1475,7 @@ function benchRender() {
   const shellKey = benchSys + '|' + structSig() + '|' + benchSel
   if (shellKey !== benchShellKey) {
     benchShellKey = shellKey
-    document.getElementById('bench-title').textContent = 'workbench — ' + sys.name
+    document.getElementById('bench-title').textContent = 'workbench — ' + sys.name + ' (' + slabType(sys) + ' slab)'
     document.getElementById('bench-switch').innerHTML = ''
     document.getElementById('bench-diagram').innerHTML =
       '<div class="mgrid">' + members.map(memberCard).join('') + '</div>'
@@ -1434,9 +1526,66 @@ function benchRender() {
           : '<button class="hot" onclick="act(\\'' + a.name + '\\',\\'expose\\')">expose</button>')
     + '</div>'
     + '<div class="board">' + boardHtml(a) + '</div>'
-    + (wires.length
-        ? '<div class="pwires">' + wires.map(([k, v]) => '<div class="w"><b>' + esc(k) + '</b><span>' + esc(v) + '</span></div>').join('') + '</div>'
-        : '')
+    + wiresHtml(sys, a)
+}
+// The patch bay: wires readable everywhere, editable when the system's
+// manifest is daemon-owned (created via UI/API). Patching redeploys the
+// caller — env only injects at container start.
+function wiresHtml(sys, a) {
+  const wires = Object.entries(sys.wires ?? {}).filter(([k, v]) =>
+    k.startsWith(a.name + '.') || new RegExp('//' + a.name + '([:/]|$)').test(v))
+  const rows = wires.map(([k, v]) =>
+    '<div class="w"><b>' + esc(k) + '</b><span>' + esc(v) + '</span>'
+    + (sys.editable ? '<button class="unpatch warn" title="unpatch (redeploys)" onclick="unpatch(\\'' + esc(sys.name) + '\\',\\'' + esc(k) + '\\')">&#10005;</button>' : '')
+    + '</div>').join('')
+  if (!sys.editable) {
+    return (rows ? '<div class="pwires">' + rows + '</div>' : '')
+      + (sys.origin ? '' : '<div class="pnote">wires defined in ' + esc(sys.sourceFile) + ' — edit the file, then slab up</div>')
+  }
+  const others = sys.members.filter(m => m !== a.name)
+  const patch = others.length
+    ? '<div class="patchrow">'
+      + '<select id="patch-target" onchange="patchDefaults(this)"><option value="">+ patch to…</option>'
+      +   others.map(m => '<option>' + esc(m) + '</option>').join('') + '</select>'
+      + '<input id="patch-key" placeholder="ENV_KEY" spellcheck="false">'
+      + '<input id="patch-val" placeholder="http://member:port" spellcheck="false">'
+      + '<button class="hot" onclick="patchWire(\\'' + esc(sys.name) + '\\',\\'' + esc(a.name) + '\\')">patch</button>'
+      + '<div class="errmsg" id="patch-err"></div></div>'
+    : ''
+  return '<div class="pwires">' + rows + patch + '</div>'
+}
+function patchDefaults(sel) {
+  const t = appsCache.find(x => x.name === sel.value)
+  document.getElementById('patch-key').value = sel.value ? sel.value.toUpperCase().replace(/-/g, '_') + '_URL' : ''
+  document.getElementById('patch-val').value = t ? 'http://' + t.name + ':' + t.manifest.port : ''
+}
+async function patchWire(sysName, caller) {
+  const key = document.getElementById('patch-key').value.trim()
+  const val = document.getElementById('patch-val').value.trim()
+  const err = document.getElementById('patch-err')
+  if (!key || !val) { err.textContent = 'pick a target (or fill key + value)'; return }
+  err.textContent = 'patching + redeploying ' + caller + '…'
+  const r = await fetch('/v1/systems/' + sysName + '/wires', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ set: { [caller + '.' + key]: val } }),
+  })
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok) { err.textContent = d.error ?? ('failed (' + r.status + ')'); return }
+  benchShellKey = ''
+  const panel = document.getElementById('bench-panel')
+  panel.dataset.key = ''
+  load()
+}
+async function unpatch(sysName, key) {
+  const r = await fetch('/v1/systems/' + sysName + '/wires', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ remove: [key] }),
+  })
+  if (r.ok) {
+    benchShellKey = ''
+    document.getElementById('bench-panel').dataset.key = ''
+    load()
+  }
 }
 
 
@@ -1490,7 +1639,7 @@ function nodeBand(node) {
   const sorted = [...(node.systems ?? [])].sort((a, b) => a.name.localeCompare(b.name))
   const solo = node.apps.filter(a => !sorted.some(s => s.members.includes(a.name)))
   let tiles = sorted.map(sys =>
-    tileHtml(sys.name, node.apps.filter(a => sys.members.includes(a.name)), 'system',
+    tileHtml(sys.name, node.apps.filter(a => sys.members.includes(a.name)), slabType(sys) + ' slab',
       node.self ? "flyTo('cab-" + esc(sys.name) + "')" : openRemote, maxrpm)
   ).join('')
   if (solo.length) tiles += tileHtml('slab', solo, 'standalone', node.self ? "flyTo('cab-slab')" : openRemote, maxrpm)

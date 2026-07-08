@@ -6,7 +6,7 @@ import path from 'path'
 import express, { Request, Response, NextFunction } from 'express'
 import { AppRecord, Engine, JobRecord, Manifest, SystemManifest, SystemRecord, TrunkConfig, DAEMON_PORT, PROXY_PORT } from './types'
 import { loadState, saveState, allocateHostPort, getSecrets, setSecrets, deleteSecrets, slabDir, effectiveNodeConfig } from './state'
-import { loadManifest, loadSystemManifest, parseDuration } from './manifest'
+import { loadManifest, loadSystemManifest, parseSystemManifest, systemManifestToToml, parseDuration } from './manifest'
 import { createProxy } from './proxy'
 import { createEngine } from './engine'
 import { dashboardHtml, apiHumanHtml, faviconSvg } from './dashboard'
@@ -351,7 +351,15 @@ async function main(): Promise<void> {
         saveState(state)
         return
       }
-      job.containerId = await engine.runJob(job, imageTag)
+      const nets: string[] = []
+      for (const sysName of job.systems ?? []) {
+        const sys = systems[sysName]
+        if (!sys) throw new Error(`job system "${sysName}" no longer exists`)
+        const net = systemNet(sys)
+        await engine.ensureNetwork(net)
+        nets.push(net)
+      }
+      job.containerId = await engine.runJob(job, imageTag, nets)
       job.state = 'running'
       job.startedAt = new Date().toISOString()
       saveState(state)
@@ -563,19 +571,41 @@ async function main(): Promise<void> {
   }))
 
   api.get('/v1/systems', wrap(async (req, res) => {
-    res.json({ systems: Object.values(systems) })
+    // `editable`: wires may be patched via the API/dashboard — true only for
+    // daemon-owned manifests (created inline) that aren't adopted from a peer
+    const systemsDir = path.join(slabDir(), 'systems') + path.sep
+    res.json({
+      systems: Object.values(systems).map((s) => ({
+        ...s,
+        editable: !s.origin && s.sourceFile.startsWith(systemsDir),
+      })),
+    })
   }))
 
   api.post('/v1/systems', wrap(async (req, res) => {
-    const sourceFile = req.body?.sourceFile
-    if (typeof sourceFile !== 'string' || !path.isAbsolute(sourceFile)) {
-      throw new HttpError(400, 'body must be { sourceFile: <absolute path to system.toml> }')
-    }
+    let sourceFile = req.body?.sourceFile
     let manifest: SystemManifest
-    try {
-      manifest = loadSystemManifest(sourceFile)
-    } catch (err) {
-      throw new HttpError(400, (err as Error).message)
+    if (req.body?.manifest && typeof req.body.manifest === 'object') {
+      // Inline manifest (dashboard / agents): validate, then persist a real
+      // TOML under ~/.slab/systems so file & CLI workflows stay symmetrical.
+      try {
+        manifest = parseSystemManifest(req.body.manifest as Record<string, unknown>)
+      } catch (err) {
+        throw new HttpError(400, (err as Error).message)
+      }
+      const dir = path.join(slabDir(), 'systems')
+      fs.mkdirSync(dir, { recursive: true })
+      sourceFile = path.join(dir, `${manifest.name}.toml`)
+      fs.writeFileSync(sourceFile, systemManifestToToml(manifest))
+    } else {
+      if (typeof sourceFile !== 'string' || !path.isAbsolute(sourceFile)) {
+        throw new HttpError(400, 'body must be { sourceFile: <absolute path to system.toml> } or { manifest: {...} }')
+      }
+      try {
+        manifest = loadSystemManifest(sourceFile)
+      } catch (err) {
+        throw new HttpError(400, (err as Error).message)
+      }
     }
     const baseDir = path.dirname(sourceFile)
 
@@ -611,6 +641,63 @@ async function main(): Promise<void> {
     systems[manifest.name] = record
     saveState(state)
     res.status(existing ? 200 : 201).json({ system: record })
+  }))
+
+  // Patch wires: { set?: { "<member>.<ENV>": value }, remove?: [key] }.
+  // Only daemon-owned manifests (~/.slab/systems) are UI/API-editable — a
+  // manifest in YOUR repo stays yours; adopted systems are edited on the
+  // console node. Affected members are redeployed (env injects at start).
+  api.put('/v1/systems/:name/wires', wrap(async (req, res) => {
+    const system = getSystemOr404(nameParam(req))
+    if (system.origin) {
+      throw new HttpError(409, `system "${system.name}" is adopted from node "${system.origin}" — edit wires there`)
+    }
+    const owned = system.sourceFile.startsWith(path.join(slabDir(), 'systems') + path.sep)
+    if (!owned) {
+      throw new HttpError(409, `system "${system.name}" is defined in ${system.sourceFile} — edit that file and re-run: slab up`)
+    }
+    const set = (req.body?.set ?? {}) as Record<string, unknown>
+    const remove = Array.isArray(req.body?.remove) ? (req.body.remove as string[]).map(String) : []
+    const memberSet = new Set(system.members)
+    const touched = new Set<string>()
+    for (const [k, v] of Object.entries(set)) {
+      const m = /^([a-z][a-z0-9-]*)\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(k)
+      if (!m) throw new HttpError(400, `invalid wire key "${k}" — expected <member>.<ENV_KEY>`)
+      if (!memberSet.has(m[1])) throw new HttpError(400, `wire "${k}" targets "${m[1]}", which is not a member of ${system.name}`)
+      system.wires[k] = String(v)
+      touched.add(m[1])
+    }
+    for (const k of remove) {
+      if (k in system.wires) {
+        delete system.wires[k]
+        touched.add(k.split('.')[0])
+      }
+    }
+    // persist back to the daemon-owned toml
+    let manifest: SystemManifest
+    try {
+      manifest = loadSystemManifest(system.sourceFile)
+    } catch (err) {
+      throw new HttpError(500, `cannot re-read ${system.sourceFile}: ${(err as Error).message}`)
+    }
+    manifest.wires = { ...system.wires }
+    fs.writeFileSync(system.sourceFile, systemManifestToToml(manifest))
+    saveState(state)
+    // redeploy members whose env changed (local ones — remote members get it
+    // on the next system deploy)
+    const redeployed: string[] = []
+    for (const m of touched) {
+      const app = state.apps[m]
+      if (!app) continue
+      try {
+        await deployApp(app)
+        redeployed.push(m)
+      } catch (err) {
+        res.status(500).json({ error: `wire saved, but redeploying "${m}" failed: ${(err as Error).message}` })
+        return
+      }
+    }
+    res.json({ system, redeployed })
   }))
 
   api.post('/v1/systems/:name/deploy', wrap(async (req, res) => {
@@ -837,6 +924,10 @@ async function main(): Promise<void> {
     if (!/^\d+(s|m|h)$/.test(timeout)) {
       throw new HttpError(400, `invalid timeout "${timeout}" — use e.g. "90s", "10m", "1h"`)
     }
+    const jobSystems: string[] = Array.isArray(body.systems) ? body.systems.map(String) : []
+    for (const s of jobSystems) {
+      if (!systems[s]) throw new HttpError(400, `unknown system "${s}" — the job can only join systems on this node`)
+    }
 
     let sourceDir: string | null = null
     let gitUrl: string | null = null
@@ -873,6 +964,7 @@ async function main(): Promise<void> {
       image,
       command,
       env,
+      systems: jobSystems,
       timeout,
       state: 'queued',
       exitCode: null,

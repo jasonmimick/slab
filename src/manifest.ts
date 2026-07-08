@@ -87,6 +87,12 @@ import { SystemManifest } from './types'
 export function loadSystemManifest(file: string): SystemManifest {
   if (!fs.existsSync(file)) throw new Error(`No system manifest at ${file}`)
   const raw = parse(fs.readFileSync(file, 'utf-8')) as Record<string, unknown>
+  return parseSystemManifest(raw)
+}
+
+// Shared by file loads and the inline-manifest API (POST /v1/systems with
+// { manifest } — how the dashboard and agents create systems without files).
+export function parseSystemManifest(raw: Record<string, unknown>): SystemManifest {
   const name = String(raw.name ?? '')
   if (!NAME_RE.test(name)) {
     throw new Error(`Invalid system name "${name}" — lowercase letters, digits, hyphens, 2-31 chars`)
@@ -121,4 +127,24 @@ export function loadSystemManifest(file: string): SystemManifest {
     wires[k] = String(v)
   }
   return { name, members, wires }
+}
+
+// Render a manifest back to TOML — inline-created systems get a real file
+// under ~/.slab/systems/ so the CLI/file/git workflows stay symmetrical.
+export function systemManifestToToml(m: SystemManifest): string {
+  const lines: string[] = [`name = ${JSON.stringify(m.name)}`, '']
+  for (const [app, cfg] of Object.entries(m.members)) {
+    lines.push(`[apps.${app}]`)
+    lines.push(`source = ${JSON.stringify(cfg.source)}`)
+    if (cfg.node) lines.push(`node = ${JSON.stringify(cfg.node)}`)
+    lines.push('')
+  }
+  if (Object.keys(m.wires).length) {
+    lines.push('[wires]')
+    for (const [k, v] of Object.entries(m.wires)) {
+      lines.push(`${JSON.stringify(k)} = ${JSON.stringify(v)}`)
+    }
+    lines.push('')
+  }
+  return lines.join('\n')
 }

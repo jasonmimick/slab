@@ -218,7 +218,8 @@ program
   .option('-t, --timeout <duration>', 'kill the job after this long (e.g. 90s, 10m, 1h)', '30m')
   .option('-d, --detach', 'start the job and return immediately (follow with: slab job logs <id>)')
   .option('--name <name>', 'job name (default: source dir basename)')
-  .action(action(async (source: string | undefined, cmd: string[], opts: { image?: string; env: string[]; timeout: string; detach?: boolean; name?: string }) => {
+  .option('-s, --system <name>', 'join a system network — the job reaches members (incl. private) by name (repeatable)', (v: string, acc: string[]) => [...acc, v], [] as string[])
+  .action(action(async (source: string | undefined, cmd: string[], opts: { image?: string; env: string[]; timeout: string; detach?: boolean; name?: string; system: string[] }) => {
     // `slab run -- npm test` puts "npm" in [source]; if the arg is neither a
     // directory nor a git url, treat it as the first command word (cwd source).
     let src = source ?? process.cwd()
@@ -236,6 +237,7 @@ program
       ...(looksLikeGitUrl(src) && !isDir(path.resolve(src)) ? { gitUrl: src } : { sourceDir: path.resolve(src) }),
       ...(opts.image ? { image: opts.image } : {}),
       ...(opts.name ? { name: opts.name } : {}),
+      ...(opts.system.length ? { systems: opts.system } : {}),
       command: cmd,
       env,
       timeout: opts.timeout,

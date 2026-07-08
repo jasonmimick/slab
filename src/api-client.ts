@@ -53,6 +53,7 @@ export function clientFor(base: string, token?: string, timeoutMs?: number) {
     createJob: (spec: {
       sourceDir?: string; gitUrl?: string; image?: string
       command?: string[]; env?: Record<string, string>; name?: string; timeout?: string
+      systems?: string[]
     }) => req<{ job: JobRecord }>('POST', '/v1/jobs', spec),
     getJob: (id: string) => req<{ job: JobRecord }>('GET', `/v1/jobs/${id}`),
     jobLogs: (id: string, tail = 100) => req<{ logs: string }>('GET', `/v1/jobs/${id}/logs?tail=${tail}`),
@@ -61,6 +62,9 @@ export function clientFor(base: string, token?: string, timeoutMs?: number) {
     play: (seconds: number) => req<{ playing: boolean; seconds: number }>('POST', '/v1/play', { seconds }),
     listSystems: () => req<{ systems: SystemRecord[] }>('GET', '/v1/systems'),
     createSystem: (sourceFile: string) => req<{ system: SystemRecord }>('POST', '/v1/systems', { sourceFile }),
+    createSystemInline: (manifest: unknown) => req<{ system: SystemRecord }>('POST', '/v1/systems', { manifest }),
+    patchWires: (name: string, body: { set?: Record<string, string>; remove?: string[] }) =>
+      req<{ system: SystemRecord; redeployed: string[] }>('PUT', `/v1/systems/${name}/wires`, body),
     deploySystem: (name: string) => req<{ system: SystemRecord; apps: AppRecord[] }>('POST', `/v1/systems/${name}/deploy`),
     removeSystem: (name: string) => req<void>('DELETE', `/v1/systems/${name}`),
     listPeers: () => req<{ peers: PeerRecord[] }>('GET', '/v1/peers'),

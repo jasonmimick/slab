@@ -301,12 +301,13 @@ async function main() {
         env: z.record(z.string(), z.string()).optional().describe('Env vars for the job'),
         timeout: z.string().optional().describe('Kill the job after this long, e.g. "90s", "10m" (default 30m)'),
         name: z.string().optional().describe('Job name (default: source dir basename)'),
+        systems: z.array(z.string()).optional().describe('System networks to join — the job can reach members (including private ones) by name, e.g. curl http://<member>:<port>. This is the sandbox for working ON a system.'),
         wait: z.number().int().positive().optional().describe('Max seconds to block for the result (default 300)'),
       },
     },
-    async ({ sourceDir, gitUrl, image, command, env, timeout, name, wait }) => {
+    async ({ sourceDir, gitUrl, image, command, env, timeout, name, systems, wait }) => {
       try {
-        let { job } = await client.createJob({ sourceDir, gitUrl, image, command, env, timeout, name })
+        let { job } = await client.createJob({ sourceDir, gitUrl, image, command, env, timeout, name, systems })
         const deadline = Date.now() + (wait ?? 300) * 1000
         const done = new Set(['succeeded', 'failed', 'canceled'])
         while (!done.has(job.state) && Date.now() < deadline) {
@@ -349,12 +350,16 @@ async function main() {
       description:
         'Deploy a system: a group of apps wired together on a private network. Members reach each other at http://<app-name>:<port>; [wires] in the manifest inject env vars; members with public=false in their slab.toml are reachable ONLY inside the system. Creates/updates the system and deploys every member in dependency order. Returns the system record and member app records.',
       inputSchema: {
-        sourceFile: z.string().describe('Absolute path to a system.toml'),
+        sourceFile: z.string().optional().describe('Absolute path to a system.toml'),
+        manifest: z.record(z.string(), z.any()).optional().describe('Inline system manifest instead of a file: { name, apps: { <member>: { source, node? } }, wires: { "<member>.<ENV>": value } } — slab persists it under ~/.slab/systems'),
       },
     },
-    async ({ sourceFile }) => {
+    async ({ sourceFile, manifest }) => {
       try {
-        const { system } = await client.createSystem(sourceFile)
+        if (!sourceFile && !manifest) throw new Error('provide sourceFile or manifest')
+        const { system } = manifest
+          ? await client.createSystemInline(manifest)
+          : await client.createSystem(sourceFile!)
         const { system: deployed, apps } = await client.deploySystem(system.name)
         return ok({ system: deployed, apps })
       } catch (err) {

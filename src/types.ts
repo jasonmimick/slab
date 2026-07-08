@@ -80,6 +80,8 @@ export interface JobRecord {
   image: string | null       // stock image to run (image mode); null = Dockerfile mode
   command: string[]          // container command; [] = image default CMD
   env: Record<string, string>
+  systems?: string[]         // system networks the job joins — the sandbox-agent
+                             // primitive: the job can reach private members by name
   timeout: string            // duration ("30s" | "5m" | "1h"); enforced by the daemon
   state: JobState
   exitCode: number | null    // set when the container exits
@@ -171,8 +173,9 @@ export interface Engine {
   buildJobImage(job: JobRecord): Promise<string>
   // Create + start the job container: label {'slab.job': id}, no ports, no
   // restart policy; image mode bind-mounts sourceDir at /workspace (rw) and
-  // sets it as the workdir. Returns container id.
-  runJob(job: JobRecord, imageTag: string): Promise<string>
+  // sets it as the workdir. `networks` (system nets) are joined after start —
+  // the job reaches members by name, including private ones. Returns id.
+  runJob(job: JobRecord, imageTag: string, networks?: string[]): Promise<string>
   waitJob(containerId: string): Promise<number>   // docker wait -> exit code
   getJobLogs(job: JobRecord, tail: number): Promise<string>
   stopJob(job: JobRecord): Promise<void>          // stop, keep container (logs stay readable)
