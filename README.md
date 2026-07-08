@@ -197,10 +197,13 @@ Rough order; nothing here is promised, everything here is intended.
    sourced jobs land on whichever node has the fewest active jobs. A bunch
    of slabs, one hyperscaler: this lane is done pending a real scheduler
    (capacity signals beyond job count).
-7. **Multi-target drivers — `slab deploy --target aws|fly`.** The Engine
-   interface already isolates Docker; a second driver renders the same
-   manifest to Fargate/Lambda/RDS (or Fly machines). One manifest, one verb
-   set, many targets — agents never learn AWS, they learn slab.
+7. **Multi-target providers — `slab deploy --target aws|fly`.** The Engine
+   interface already isolates Docker; a provider renders the same manifest
+   to Fargate/Lambda/RDS (or Fly machines). One manifest, one verb set,
+   many targets — agents never learn AWS, they learn slab. **Design doc
+   up:** [docs/design/providers.md](docs/design/providers.md) — the
+   Provider API, the AWS worked example, and the conformance path for
+   contributors.
 8. **Go rewrite (v1.0, decided).** TypeScript was the right spike language —
    MCP SDK first-class, product-in-a-day. Go is the right shipping language:
    the entire container/networking neighborhood lives there (Docker client,

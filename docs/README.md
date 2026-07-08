@@ -23,6 +23,7 @@ New here? [Install slab](../README.md#install), then read
 |---|---|
 | [design/systems.md](design/systems.md) | systems: wiring + isolation (private networks, wires) |
 | [design/trunks.md](design/trunks.md) | trunks: how systems span machines |
+| [design/providers.md](design/providers.md) | providers: the plugin API for cloud targets (aws worked example) |
 
 ## the vocabulary
 
