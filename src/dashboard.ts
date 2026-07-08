@@ -111,7 +111,7 @@ export function dashboardHtml(proxyPort: number): string {
   body.bench-anim { overflow: hidden; height: 100vh; perspective: 1600px; }
   body.bench-anim #cube {
     transform-style: preserve-3d;
-    transition: transform .6s cubic-bezier(.5,.05,.3,1);
+    transition: transform 1.25s cubic-bezier(.45,.05,.2,1);
     height: 100vh;
   }
   body.bench-anim #face-rack, body.bench-anim #face-bench {
@@ -895,7 +895,7 @@ function enterBench(sysName) {
     setTimeout(() => {
       document.body.classList.remove('bench-anim', 'bench-turned')
       document.body.classList.add('bench-static')
-    }, 640)
+    }, 1300)
   }))
 }
 function exitBench() {
@@ -912,7 +912,7 @@ function exitBench() {
     setTimeout(() => {
       document.body.classList.remove('bench-anim')
       benchSys = null
-    }, 640)
+    }, 1300)
   }))
 }
 document.addEventListener('keydown', (e) => {
