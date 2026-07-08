@@ -58,6 +58,7 @@ More detail:
 - [docs/manifest.md](docs/manifest.md) — complete `slab.toml` reference
 - [docs/agents.md](docs/agents.md) — the MCP tool surface for agents
 - [docs/api.md](docs/api.md) — the daemon HTTP API
+- [docs/skins.md](docs/skins.md) — dashboard skins: built-ins (stereo, hyperscaler) + build your own CSS skin
 - [examples/](examples/) — runnable sample apps
 
 ## Status

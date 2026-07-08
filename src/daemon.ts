@@ -46,6 +46,10 @@ function idParam(req: Request): string {
   return Array.isArray(v) ? v[0] : v
 }
 
+function idParamLike(v: string | string[]): string {
+  return Array.isArray(v) ? v[0] : v
+}
+
 // Shared slug rules for job names and the node name (same shape as app names)
 const JOB_NAME_RE = /^[a-z][a-z0-9-]{1,30}$/
 function sanitizeJobName(raw: string): string {
@@ -693,6 +697,34 @@ async function main(): Promise<void> {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     res.send(dashboardHtml(PROXY_PORT))
   })
+
+  // ── skins: user-built dashboard themes ────────────────────────────────────
+  // Built-ins live in the page's stylesheet (data-skin attr); custom skins are
+  // plain CSS files in ~/.slab/skins/<name>.css, loaded over the base styles.
+  const SKINS_DIR = path.join(process.env.SLAB_DIR ?? path.join(os.homedir(), '.slab'), 'skins')
+  const SKIN_RE = /^[a-z0-9-]+$/
+
+  api.get('/v1/skins', wrap(async (_req, res) => {
+    let custom: string[] = []
+    try {
+      custom = fs.readdirSync(SKINS_DIR)
+        .filter((f) => f.endsWith('.css'))
+        .map((f) => f.slice(0, -4))
+        .filter((n) => SKIN_RE.test(n))
+        .sort()
+    } catch { /* no skins dir yet */ }
+    res.json({ skins: ['stereo', 'hyperscaler', ...custom.filter((n) => n !== 'stereo' && n !== 'hyperscaler')] })
+  }))
+
+  api.get('/skins/:file', wrap(async (req, res) => {
+    const file = idParamLike(req.params.file)
+    const m = /^([a-z0-9-]+)\.css$/.exec(file)
+    if (!m) throw new HttpError(400, 'skin files are <name>.css')
+    const full = path.join(SKINS_DIR, `${m[1]}.css`)
+    if (!fs.existsSync(full)) throw new HttpError(404, `no skin "${m[1]}" in ${SKINS_DIR}`)
+    res.setHeader('Content-Type', 'text/css; charset=utf-8')
+    res.send(fs.readFileSync(full, 'utf-8'))
+  }))
 
   // Player: round-robin healthchecks through the ingress — every note is a
   // real request; if you can hear an app, it's answering.

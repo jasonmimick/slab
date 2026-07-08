@@ -1,0 +1,38 @@
+/* slab custom skin: phosphor — green CRT terminal.
+ * Install: cp phosphor.css ~/.slab/skins/  → pick "phosphor" in dashboard settings.
+ * A custom skin loads OVER the stereo baseline: override the CSS variables
+ * for the palette, then restyle any selector you like. Full contract: docs/skins.md
+ */
+:root, :root[data-theme="light"], :root[data-theme="dark"] {
+  --accent: #39ff6e;
+  --bg: #030604; --rail: #04120a;
+  --text: #b8ffd0; --dim: #59c47f; --faint: #2e7a4c;
+  --green: #39ff6e; --red: #ff5f5f; --blue: #39d0ff;
+  --unit1: #051208; --unit2: #04100a; --unit3: #030b06; --unit4: #04100a;
+  --cab-hi: #04100a; --cab-lo: #030b06; --cheek: #0a2a16;
+  --edge: #14522e; --edge2: #0e3d22; --edge3: #0e3d22; --line: #0a2a16;
+  --groove: #051a0e; --od: #0e3d22; --node: #04100a;
+  --drawer-bg: #030b06; --scrim: rgba(0, 8, 3, .88); --btn-bg: rgba(57, 255, 110, .05);
+}
+
+/* everything glows a little */
+body {
+  text-shadow: 0 0 4px rgba(57, 255, 110, .25);
+  background: var(--bg);
+}
+
+/* scanlines over the whole tube */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .22) 0 1px, transparent 1px 3px);
+}
+
+/* phosphor trace borders instead of machined metal */
+.unit, .cabinet, .deck, .jobdeck, .otile {
+  box-shadow: none;
+  border-color: var(--edge2);
+}

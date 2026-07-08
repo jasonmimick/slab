@@ -10,9 +10,18 @@ export function dashboardHtml(proxyPort: number): string {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>slab</title>
 <script>
-  // theme init before first paint (no flash): saved choice, else OS preference
+  // theme + skin init before first paint (no flash): saved choice, else OS preference
   document.documentElement.dataset.theme =
     localStorage.getItem('slab-theme') ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+  ;(function () {
+    var skin = localStorage.getItem('slab-skin') || 'stereo'
+    document.documentElement.dataset.skin = skin
+    if (skin !== 'stereo' && skin !== 'hyperscaler') {
+      var l = document.createElement('link')
+      l.id = 'skincss'; l.rel = 'stylesheet'; l.href = '/skins/' + skin + '.css'
+      document.head.appendChild(l)
+    }
+  })()
 </script>
 <style>
   :root {
@@ -42,6 +51,68 @@ export function dashboardHtml(proxyPort: number): string {
     --od: #b5b2aa; --node: #f6f4ef;
     --drawer-bg: #f2f0ea; --scrim: rgba(120,118,112,.55); --btn-bg: rgba(255,255,255,.45);
   }
+
+  /* ── skin: hyperscaler — flat ops console. No hi-fi hardware: no cheeks,
+     vents, VU meters, LED ladders or audio deck; dense rows, cool accent.
+     Composes with dark/light. Custom skins (~/.slab/skins/*.css) load on top
+     of the stereo baseline instead — see docs/skins.md. ── */
+  :root[data-skin="hyperscaler"] {
+    --accent: #4da3ff;
+    --bg: #0a0c10; --rail: #0d1015;
+    --text: #dfe4ea; --dim: #98a0ab; --faint: #5c6572;
+    --unit1: #12151b; --unit2: #12151b; --unit3: #101318; --unit4: #101318;
+    --cab-hi: #0e1116; --cab-lo: #0e1116; --cheek: #1a1e26;
+    --edge: #262b35; --edge2: #232833; --edge3: #232833; --line: #1a1e26;
+    --groove: #161a21; --od: #2e3440; --node: #12151b;
+    --drawer-bg: #0d1015; --scrim: rgba(5,6,8,.85); --btn-bg: rgba(255,255,255,.03);
+  }
+  :root[data-skin="hyperscaler"][data-theme="light"] {
+    --accent: #1d6fd6;
+    --bg: #f3f4f6; --rail: #e6e8eb;
+    --text: #1c1e24; --dim: #4b5058; --faint: #8a8f98;
+    --unit1: #ffffff; --unit2: #ffffff; --unit3: #fafafb; --unit4: #fafafb;
+    --cab-hi: #ececef; --cab-lo: #ececef; --cheek: #d9dbdf;
+    --edge: #c9ccd2; --edge2: #d5d8dc; --edge3: #d5d8dc; --line: #e6e8eb;
+    --groove: #c2c5cb; --od: #c4c8cf; --node: #ffffff;
+    --drawer-bg: #ffffff; --scrim: rgba(120,124,130,.5); --btn-bg: #ffffff;
+  }
+  [data-skin="hyperscaler"] body { background: var(--bg); }
+  [data-skin="hyperscaler"] .vents { display: none; }
+  [data-skin="hyperscaler"] .deck { display: none; }
+  [data-skin="hyperscaler"] .cabinet {
+    border: 1px solid var(--edge2); border-radius: 4px; box-shadow: none;
+  }
+  [data-skin="hyperscaler"] .cabinet.flash { animation: none; outline: 2px solid var(--accent); }
+  [data-skin="hyperscaler"] .rack { box-shadow: none; padding: 8px; border-top-color: var(--line); }
+  [data-skin="hyperscaler"] .cabmark { font-size: 11px; }
+  [data-skin="hyperscaler"] .cabmark::after { content: none; }
+  [data-skin="hyperscaler"] .unit {
+    background: var(--unit1); box-shadow: none; border-radius: 4px;
+    padding: 10px 16px 10px 44px;
+  }
+  [data-skin="hyperscaler"] .unit::before, [data-skin="hyperscaler"] .unit::after { display: none; }
+  [data-skin="hyperscaler"] .sled { display: none; }
+  [data-skin="hyperscaler"] .vu { display: none; }
+  [data-skin="hyperscaler"] .unum { writing-mode: horizontal-tb; font-size: 8px; width: 34px; border-radius: 4px 0 0 4px; }
+  [data-skin="hyperscaler"] .pwr { background: var(--unit3); box-shadow: none; border-color: var(--edge2); }
+  [data-skin="hyperscaler"] .pwr::after { box-shadow: none !important; animation: none !important; }
+  [data-skin="hyperscaler"] .plate .name { font-size: 14px; font-weight: 600; }
+  [data-skin="hyperscaler"] .lcd { background: transparent; border-color: transparent; box-shadow: none; text-shadow: none; color: var(--dim); }
+  [data-skin="hyperscaler"] .meter .spark path { filter: none; }
+  [data-skin="hyperscaler"] .board {
+    background: var(--unit3); border: 1px solid var(--edge2); border-radius: 4px;
+  }
+  [data-skin="hyperscaler"] .board::after { color: var(--faint); }
+  [data-skin="hyperscaler"] .chip { background: var(--unit1); border: 1px solid var(--edge2); box-shadow: none; }
+  [data-skin="hyperscaler"] .chip::before, [data-skin="hyperscaler"] .chip::after { display: none; }
+  [data-skin="hyperscaler"] .chip .lbl { color: var(--faint); }
+  [data-skin="hyperscaler"] .chip .val { color: var(--text); }
+  [data-skin="hyperscaler"] .jobdeck { background: var(--unit1); box-shadow: none; border-radius: 4px; }
+  [data-skin="hyperscaler"] .otile { background: var(--unit1); box-shadow: none; border-radius: 4px; }
+  [data-skin="hyperscaler"] .otile .od, [data-skin="hyperscaler"] .mcname .od, [data-skin="hyperscaler"] .jl { box-shadow: none !important; animation: none !important; }
+  [data-skin="hyperscaler"] .thumb { border-radius: 3px; }
+  [data-skin="hyperscaler"] #newbay { background: none; border-radius: 4px; }
+  [data-skin="hyperscaler"] #bench-panel, [data-skin="hyperscaler"] .mcard, [data-skin="hyperscaler"] .mdiagram, [data-skin="hyperscaler"] #bench-diagram { box-shadow: none; border-radius: 4px; }
   * { box-sizing: border-box; margin: 0; }
   body {
     font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -453,6 +524,8 @@ export function dashboardHtml(proxyPort: number): string {
   .setrow input[type=color]::-webkit-color-swatch-wrapper { padding: 2px; }
   .setrow input[type=color]::-webkit-color-swatch { border: none; border-radius: 50%; }
   .setrow .swatches { display: flex; gap: 8px; }
+  .setrow .skinrow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .setrow .skinrow button.active { color: var(--accent); border-color: var(--accent); border-width: 1.5px; }
   .setrow .swatches i { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid var(--edge); }
   .setrow.sliders { flex-direction: column; align-items: stretch; gap: 10px; }
   .srow { display: flex; align-items: center; gap: 12px; }
@@ -553,6 +626,28 @@ function toggleTheme() {
   const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'
   document.documentElement.dataset.theme = t
   localStorage.setItem('slab-theme', t)
+}
+// ── skins: built-ins live in this stylesheet; custom ones are CSS files in
+// ~/.slab/skins served at /skins/<name>.css, loaded over the stereo baseline
+const BUILTIN_SKINS = ['stereo', 'hyperscaler']
+function applySkin(name) {
+  document.documentElement.dataset.skin = name
+  let link = document.getElementById('skincss')
+  if (!BUILTIN_SKINS.includes(name)) {
+    if (!link) {
+      link = document.createElement('link')
+      link.id = 'skincss'; link.rel = 'stylesheet'
+      document.head.appendChild(link)
+    }
+    link.href = '/skins/' + name + '.css'
+  } else if (link) {
+    link.remove()
+  }
+}
+function setSkin(name) {
+  applySkin(name)
+  localStorage.setItem('slab-skin', name)
+  openSettings()   // re-render so the active skin button updates
 }
 fetch('/v1/health').then(r => r.json()).then(h => {
   if (h.node) document.getElementById('nodetag').textContent = '◆ ' + h.node
@@ -1310,17 +1405,24 @@ function setAccent(v) {
   const inp = document.getElementById('accent-input')
   if (inp) inp.value = v
 }
-function openSettings() {
+async function openSettings() {
   const presets = ['#ffb454', '#6ee7b7', '#82b8e8', '#f07f78', '#d8b4fe', '#e2e8f0']
   const cur = localStorage.getItem('slab-accent') ?? '#ffb454'
+  let skins = BUILTIN_SKINS
+  try { const r = await fetch('/v1/skins'); skins = (await r.json()).skins ?? BUILTIN_SKINS } catch (e) {}
+  const curSkin = document.documentElement.dataset.skin || 'stereo'
   document.getElementById('dtitle').textContent = 'settings'
   document.getElementById('dapps').innerHTML = ''
   document.getElementById('dbody').innerHTML =
-    '<div class="setrow"><span class="k">accent color</span>'
+    '<div class="setrow"><span class="k">skin</span><span class="skinrow">'
+    + skins.map(s => '<button class="' + (s === curSkin ? 'active' : '') + '" onclick="setSkin(\\'' + s + '\\')">' + esc(s) + '</button>').join('')
+    + '</span></div>'
+    + '<div class="setrow"><span class="k">accent color</span>'
     + '<input type="color" id="accent-input" value="' + cur + '" oninput="setAccent(this.value)">'
     + '<span class="swatches">' + presets.map(c => '<i style="background:' + c + '" onclick="setAccent(\\'' + c + '\\')"></i>').join('') + '</span>'
     + '</div>'
-    + '<div class="setrow"><span class="k">state</span><span style="color:var(--faint)">~/.slab · state.json, secrets/, repos/</span></div>'
+    + '<div class="setrow"><span class="k">custom skins</span><span style="color:var(--faint)">drop a css file in ~/.slab/skins/&lt;name&gt;.css — it appears here (docs/skins.md)</span></div>'
+    + '<div class="setrow"><span class="k">state</span><span style="color:var(--faint)">~/.slab · state.json, secrets/, repos/, skins/</span></div>'
   drawer.style.display = 'block'
 }
 load()
