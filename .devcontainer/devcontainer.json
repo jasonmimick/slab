@@ -9,8 +9,8 @@
   },
   "forwardPorts": [7766, 8080],
   "portsAttributes": {
-    "7766": { "label": "slab dashboard", "onAutoForward": "openPreview" },
-    "8080": { "label": "slab ingress" }
+    "7766": { "label": "slab dashboard", "onAutoForward": "openBrowser" },
+    "8080": { "label": "slab ingress", "onAutoForward": "silent" }
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "postStartCommand": "bash .devcontainer/start.sh",

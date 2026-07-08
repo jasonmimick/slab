@@ -18,16 +18,24 @@ if ! slab list 2>/dev/null | grep -q hello-fn; then
   slab deploy "$PWD/examples/mario" >/dev/null 2>&1 || true
 fi
 
-cat <<'EOF'
+DASH="http://localhost:7766"
+if [ -n "${CODESPACE_NAME:-}" ] && [ -n "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}" ]; then
+  DASH="https://${CODESPACE_NAME}-7766.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+fi
+
+cat <<EOF
 
   ┌──────────────────────────────────────────────────────────┐
-  │  slab is running.                                        │
-  │                                                          │
-  │  dashboard  -> PORTS tab: open port 7766                 │
-  │  try:          slab list                                 │
-  │                slab deploy dockersamples/linux_tweet_app │
-  │                slab run . -- echo hello from a job       │
-  │                slab expose mario   (public https url!)   │
+  │  slab is running — the rack is live.                     │
   └──────────────────────────────────────────────────────────┘
+
+  dashboard (open in a browser tab):
+  ${DASH}
+
+  try:
+    slab list
+    slab deploy dockersamples/linux_tweet_app
+    slab run . -- echo hello from a job
+    slab expose mario        # public https url, playable anywhere
 
 EOF
