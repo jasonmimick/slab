@@ -1,57 +1,118 @@
-# slab — the localhost hyperscaler
+<div align="center">
 
-slab is a tiny local PaaS for the AI-agent era: containers, Postgres, HTTP
-ingress, secrets, and public tunnels, driven by a CLI, a web dashboard, or AI
-agents talking MCP. One binary, one daemon, your own machine — no cloud
-account required to go from a directory (or a git URL) to a running,
-routable app.
+# slab
 
-## 60-second quickstart
+**the localhost hyperscaler**
 
+Your machine, run like a cloud: containers, HTTP ingress, Postgres, secrets,
+public tunnels, and one-shot jobs — driven by a CLI, a live hi-fi-rack
+dashboard, or AI agents speaking MCP.
+
+*one machine · one daemon · zero cloud accounts*
+
+</div>
+
+```text
+ ┌─────────────────────────────────────────────────────────────┐
+ │  ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒                              vents  │
+ │ ┌───────────────────────────────────────────────────┐       │
+ │ │ U01 ⏻ ▮▮▮▮▮▯▯▯  lake-api    ● running   042 req/m │  VU ◔ │
+ │ │ U02 ⏻ ▮▮▯▯▯▯▯▯  feeder      ◐ sleeping  — wakes on hit    │
+ │ │ U03 ⏻ ▮▮▮▮▮▮▮▯  scoreboard  🔒 private — system-only      │
+ │ └───────────────────────────────────────────────────┘       │
+ │  arcade_  ·  system — 3 members — 2 wires  ·  ch2 - C - sine │
+ └─────────────────────────────────────────────────────────────┘
+        every app a rack unit · flip it open to see the board
 ```
-npm install
-npm run build
-node dist/daemon.js          # or: slab daemon — starts the API (:7766) and ingress proxy (:8080)
+
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jasonmimick/slab/master/install.sh | bash
 ```
 
-In another terminal:
+The installer checks your prerequisites (and tells you exactly how to fix
+any that are missing), clones slab to `~/.slab/src`, builds it, puts `slab`
+on your PATH, and starts the daemon. Re-run it any time to upgrade.
 
+**Prerequisites** — the installer verifies all of these:
+
+| need | why | get it |
+|---|---|---|
+| **Docker** (engine running) | every app, job, and database is a container | [Docker Desktop](https://www.docker.com/products/docker-desktop) (mac) · `curl -fsSL https://get.docker.com \| sh` (linux) |
+| **Node.js ≥ 20** | the daemon + CLI runtime (until the Go rewrite) | `brew install node` · [nodejs.org](https://nodejs.org) |
+| **git** | cloning repos you deploy | `brew install git` |
+| *cloudflared* (optional) | only for `slab expose` public tunnels | `brew install cloudflared` |
+
+macOS and Linux; on Windows use WSL2.
+
+## Sixty seconds
+
+```bash
+slab deploy dockersamples/linux_tweet_app   # any github repo with a Dockerfile — no config needed
+open http://linux-tweet-app.localhost:8080  # routed by the ingress
+open http://localhost:7766                  # the rack
 ```
-node dist/cli.js deploy examples/hello-fn
-curl http://hello-fn.localhost:8080
-```
 
-Open the dashboard at [http://localhost:7766](http://localhost:7766) to see
-every app, its state, and its wiring.
+No `slab.toml` in the repo? slab infers one: name from the repo, port from
+the Dockerfile's `EXPOSE`. Add a manifest when you want more (functions,
+postgres, secrets, private members) — see [docs/manifest.md](docs/manifest.md).
 
-Once `dist/cli.js` is on your `PATH` (or you run `npm link`), the same
-commands are just `slab deploy ...`.
+## Three verbs
 
-## What it does
+| verb | what it runs | example |
+|---|---|---|
+| `slab deploy` | **apps** — services (always-on) & functions (scale-to-zero, wake-on-request) | `slab deploy owner/repo` |
+| `slab run` | **jobs** — build/test/scripts to completion, exit code + logs kept, timeout guardrail | `slab run . -- npm test` · `slab run . --image node:20 -- npm test` |
+| `slab up` | **systems** — apps wired together on a private network; `public = false` members are unreachable from outside | `slab up ./system.toml` |
+
+Everything else: `slab list · jobs · logs · secret set · expose · url ·
+stop/start/rm · node <name> · play` *(yes, you can hear your rack)*.
+
+## The dashboard
+
+`http://localhost:7766` renders your fleet as a wall of hi-fi rack cabinets:
+per-unit power buttons, VU needles swinging with live req/min, LED level
+ladders, live iframe thumbnails of running apps, a spectrum analyzer that
+plays your traffic as pentatonic audio, system wiring diagrams, a zoomed-out
+overview for many racks, and an **empty bay** — paste any GitHub URL and it
+mounts + deploys from the browser.
+
+Not your vibe? It's **skinnable**: built-in `hyperscaler` skin (flat ops
+console, all hardware chrome stripped), light/dark for both, and custom
+skins are a single CSS file in `~/.slab/skins/` — see
+[docs/skins.md](docs/skins.md).
+
+## For agents
+
+slab ships an MCP server (`dist/mcp.js`, stdio): `slab_deploy`, `slab_run`
+(blocks and returns exit code + logs), `slab_logs`, `slab_secret_set`,
+`slab_expose`, `slab_system_deploy`, … — an agent can take a repo to a
+running, routable app, or execute sandboxed jobs, without ever learning
+Docker. See [docs/agents.md](docs/agents.md). The founding thesis: agents
+create infrastructure faster than humans can track it, so the platform
+must make running things legible, bounded, and reversible.
+
+## What's in the box
 
 - **Services vs functions.** `type = "service"` is always-on and restarts if
-  it dies. `type = "function"` scales to zero: the daemon stops its
-  container after `idle_timeout` of inactivity and the ingress proxy wakes
-  it back up on the next incoming request before forwarding.
-- **Image or Dockerfile.** Set `image = "..."` for a prebuilt image (slab
-  just pulls and runs it), or drop a `Dockerfile` in the app's source dir
-  and slab builds it. `image` wins if both are present.
-- **Git-URL sources.** `slab deploy owner/repo` (or a full `https://`/`git@`
-  URL) clones into `~/.slab/repos` and does a `git pull --ff-only` on every
-  redeploy — no local checkout required.
-- **Per-app Postgres.** `postgres = true` gets you a `DATABASE_URL` injected
-  at deploy time, backed by one shared `slab-postgres` container and a
-  dedicated database per app.
-- **Secrets.** `slab secret set <app> KEY=VALUE` stores values outside the
-  manifest; they're merged into the container's env on the next deploy.
-- **Public tunnels.** `slab expose <app>` opens a free Cloudflare quick
-  tunnel (no account, no domain) pointed at the ingress proxy, so webhooks
-  and outside callers can reach an app that only lives on your laptop.
-- **Telemetry.** The dashboard and `GET /v1/apps` report live req/min per
-  app, computed from a rolling 60-second window.
-- **MCP server.** `dist/mcp.js` exposes slab over stdio so agents can create,
-  deploy, inspect logs, manage secrets, and expose apps as first-class
-  tools — see [docs/agents.md](docs/agents.md).
+  it dies. `type = "function"` scales to zero after `idle_timeout`; the
+  ingress wakes it on the next request.
+- **Jobs.** Run-to-completion workloads with exit codes, kept logs, a
+  timeout reaper, cancel, and a dashboard job bench.
+- **Image or Dockerfile.** `image = "..."` pulls and runs; otherwise the
+  `Dockerfile` is built. Git sources are pulled on every redeploy.
+- **Systems.** One Docker network per system, members reach each other by
+  app name, `[wires]` inject env bindings, private members get no host port
+  at all.
+- **Per-app Postgres.** `postgres = true` → a `DATABASE_URL` appears,
+  backed by one shared postgres container, one database per app.
+- **Secrets.** `slab secret set <app> KEY=VALUE` — outside the manifest,
+  merged into the env at deploy.
+- **Public tunnels.** `slab expose <app>` → a free Cloudflare quick-tunnel
+  URL for webhooks and demos.
+- **Named nodes.** Every daemon has an identity (`slab node`) — groundwork
+  for multi-node.
 
 More detail:
 - [docs/getting-started.md](docs/getting-started.md) — full walkthrough
@@ -75,6 +136,15 @@ v0, weekend-spike maturity. Known sharp edges, honestly stated:
 - **Function wake latency** depends on the image; the proxy waits up to 15s
   for the container to answer before giving up.
 
+## Hacking on slab itself
+
+```bash
+git clone https://github.com/jasonmimick/slab.git && cd slab
+npm install && npm run build
+node dist/daemon.js          # api :7766 + ingress :8080
+node dist/cli.js deploy examples/hello-fn
+```
+
 ## Roadmap
 
 Rough order; nothing here is promised, everything here is intended.
@@ -86,8 +156,8 @@ Rough order; nothing here is promised, everything here is intended.
    stock image. Timeout guardrail (default 30m), cancel, exit codes, logs,
    job bench on the dashboard, `slab_run` MCP tool for agents. Next up in
    this lane: the coding-agent job with a budget cap.
-2. **Overview / zoom-out mode** — a bird's-eye grid when there are many
-   systems (imagine 1000 racks): each system a small tile, live status
+2. **Overview / zoom-out mode** ✅ SHIPPED — a bird's-eye grid when there are
+   many systems (imagine 1000 racks): each system a small tile, live status
    colors, click a tile to fly into that rack. The dashboard scales from
    one laptop to a wall of racks.
 3. **Systems — wiring + isolation** ✅ SHIPPED (design + status: [docs/design/systems.md](docs/design/systems.md)).
@@ -122,4 +192,3 @@ Rough order; nothing here is promised, everything here is intended.
    byte-compatible; the daemon behind them is an implementation detail, and
    `examples/` doubles as the acceptance suite. (Interim option if
    distribution itches sooner: `bun build --compile` on the existing code.)
-
