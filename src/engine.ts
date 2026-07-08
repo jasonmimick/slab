@@ -1,6 +1,7 @@
 // slab — docker engine. Implements Engine (types.ts) with dockerode against
 // the default local socket.
 import Docker from 'dockerode'
+import { promises as dns } from 'dns'
 import { AppRecord, Engine, JobRecord, TrunkConfig } from './types'
 import { TRUNK_INGRESS_PORT } from './trunk'
 
@@ -436,13 +437,23 @@ export function createEngine(): Engine {
     await removeTrunk(systemName)
     if (!(await imageExists(TRUNK_IMAGE))) await pullImage(TRUNK_IMAGE)
 
-    // Inside a container, 127.0.0.1 is the container itself — a peer trunk
-    // published on the host loopback (same-machine cluster) is reached via
-    // host.docker.internal instead.
-    const peers = Object.fromEntries(Object.entries(cfg.peers).map(([node, p]) => [
-      node,
-      { ...p, host: p.host === '127.0.0.1' || p.host === 'localhost' ? 'host.docker.internal' : p.host },
-    ]))
+    // Containers can't resolve mDNS (.local) names and 127.0.0.1 would be the
+    // container itself — resolve peer hosts HERE on the host (getaddrinfo
+    // handles .local on macOS) and hand the trunk numeric addresses; loopback
+    // results become host.docker.internal (same-machine clusters).
+    async function trunkHost(h: string): Promise<string> {
+      if (h === '127.0.0.1' || h === 'localhost') return 'host.docker.internal'
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(h) || h === 'host.docker.internal') return h
+      try {
+        const r = await dns.lookup(h, { family: 4 })
+        return r.address === '127.0.0.1' ? 'host.docker.internal' : r.address
+      } catch {
+        return h   // best effort — leave unresolved names for the container to try
+      }
+    }
+    const peers = Object.fromEntries(await Promise.all(
+      Object.entries(cfg.peers).map(async ([node, p]) => [node, { ...p, host: await trunkHost(p.host) }] as const),
+    ))
     const containerCfg: TrunkConfig = { ...cfg, peers, ingressPort: TRUNK_INGRESS_PORT }
 
     const portKey = `${TRUNK_INGRESS_PORT}/tcp`
