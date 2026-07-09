@@ -28,7 +28,7 @@ source = "../pg-cluster/pg-replica"
 source = "../pg-cluster/pgbouncer"
 
 [wires]
-"waffle-web.API_URL" = "http://waffle-api:3000"
+"waffle-web.API_URL" = "http://waffle-api:3001"
 "waffle-api.DATABASE_URL" = "postgresql://app:apppass@pgbouncer:6432/appdb"
 "pg-replica.POSTGRESQL_MASTER_HOST" = "pg-primary"
 "pgbouncer.POSTGRESQL_HOST" = "pg-primary"

@@ -4,7 +4,7 @@
 const http = require('http')
 
 const PORT = process.env.PORT ?? 3000
-const API_URL = process.env.API_URL ?? 'http://waffle-api:3000'
+const API_URL = process.env.API_URL ?? 'http://waffle-api:3001'
 
 function page(orders, error) {
   const rows = orders

@@ -78,6 +78,14 @@ node = "some-peer"        # optional: run this member on a peer (the waffle move
   other **by app name**. An app can belong to several systems.
 - Wires become env on the named member. Cross-node members are stitched by
   **trunks** (trunk.ts) so wired hostnames keep working across machines.
+- **A system that spans nodes needs distinct member ports** (trunk
+  constraint — deploy fails with a clear error otherwise). Catalog systems
+  keep ports distinct for this reason (pg-replica 5433, waffle-api 3001).
+- Cross-node members resolve `source` on the PEER's filesystem: deploy
+  spanning systems from a path that exists on every node —
+  `~/.slab/src/examples/...` works because every install has the repo there
+  (git-pull peers' `~/.slab/src` to the right commit first). The dev-checkout
+  path only exists on euler.
 - System cast (docs): **one-way** (directed wiring), **two-way** (mutual),
   **waffle** (spans nodes).
 

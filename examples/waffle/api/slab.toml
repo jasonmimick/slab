@@ -3,5 +3,6 @@
 # system-mates can reach it.
 name = "waffle-api"
 type = "service"
-port = 3000
+# 3001, not 3000: distinct from waffle-web so the system can span nodes.
+port = 3001
 public = false

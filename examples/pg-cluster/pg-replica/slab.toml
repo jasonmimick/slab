@@ -2,12 +2,15 @@
 # the system's [wires]). Read-only — point heavy SELECT traffic here.
 name = "pg-replica"
 type = "service"
-port = 5432
+# 5433, not 5432: members of a system that spans nodes need distinct ports
+# (trunks). Costs nothing on one node, lets the cluster join a waffle.
+port = 5433
 public = false
 image = "bitnamilegacy/postgresql:17"
 volumes = ["pgdata:/bitnami/postgresql"]
 
 [env]
+POSTGRESQL_PORT_NUMBER = "5433"
 POSTGRESQL_REPLICATION_MODE = "slave"
 POSTGRESQL_REPLICATION_USER = "repl"
 POSTGRESQL_REPLICATION_PASSWORD = "replpass"

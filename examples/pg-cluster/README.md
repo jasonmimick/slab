@@ -39,7 +39,8 @@ source = "./myapp"
 ```
 
 Reads that don't need to be fresh can go straight at the replica
-(`pg-replica:5432`) — it's read-only.
+(`pg-replica:5433`) — it's read-only. (5433 so every member port is
+distinct, which is what lets this cluster join a node-spanning system.)
 
 ## Honest framing
 
