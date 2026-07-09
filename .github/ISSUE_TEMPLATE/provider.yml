@@ -1,0 +1,25 @@
+name: "provider: <name>"
+description: claim or request a cloud provider (fly, gcp, hetzner, …)
+labels: [provider]
+body:
+  - type: input
+    attributes:
+      label: provider
+      placeholder: fly
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: claiming or requesting?
+      options:
+        - "claiming — I want to build it"
+        - "requesting — I'd use it"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: notes
+      description: >
+        builders: read docs/design/providers.md first — src/providers/aws.ts is
+        the reference. what maps to services/functions? what's the native
+        https-url story?

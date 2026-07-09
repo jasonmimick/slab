@@ -1,0 +1,28 @@
+name: bug
+description: something broke — errors, wrong behavior, a unit that won't light up
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: what happened
+      description: paste the exact command and the exact error — verbatim beats summarized
+      placeholder: |
+        $ slab deploy owner/repo
+        error: ...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: what you expected
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: where
+      description: macOS/Linux/codespace · docker version · one node or a cluster
+      placeholder: "macOS 15, docker 29, two nodes over LAN"
+  - type: textarea
+    attributes:
+      label: daemon log tail (if relevant)
+      description: "`tail -30 ~/.slab/daemon.log`"
+      render: text

@@ -88,7 +88,7 @@ program.option('-N, --node <name>', 'target a peer node instead of the local dae
 // when it isn't running (detached, logs to ~/.slab/daemon.log). No more
 // "start it with: slab daemon" dead ends — critical for codespaces/demos
 // where the daemon dies with the sandbox.
-const NO_DAEMON_NEEDED = new Set(['daemon', 'init', 'upgrade'])
+const NO_DAEMON_NEEDED = new Set(['daemon', 'init', 'upgrade', 'feedback'])
 async function ensureDaemon(): Promise<void> {
   if (process.env.SLAB_DAEMON_URL) return   // explicitly pointed elsewhere — don't self-start
   try { await client.health(); return } catch { /* boot it */ }
@@ -662,6 +662,26 @@ program
   .description('run the slab daemon in-process')
   .action(action(async () => {
     await import('./daemon.js')
+  }))
+
+program
+  .command('feedback [words...]')
+  .description('30 seconds, means a lot — opens a prefilled github issue')
+  .action(action(async (words: string[]) => {
+    const title = words.join(' ').slice(0, 120)
+    let version = 'unknown'
+    try { version = execSync('git rev-parse --short HEAD', { cwd: path.resolve(__dirname, '..') }).toString().trim() } catch { /* not a git install */ }
+    const body = [
+      title ? '' : '<!-- what happened, what you expected -->',
+      '',
+      '---',
+      `slab ${version} · ${os.platform()}/${os.arch()} · node ${process.version}`,
+    ].join('\n')
+    const url = `https://github.com/jasonmimick/slab/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
+    const opener = os.platform() === 'darwin' ? 'open' : 'xdg-open'
+    try { execSync(`${opener} ${JSON.stringify(url)}`, { stdio: 'ignore' }) } catch { /* headless — the url below still works */ }
+    console.log('opening a prefilled issue — or paste this url:')
+    console.log(url)
   }))
 
 program

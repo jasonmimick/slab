@@ -148,6 +148,17 @@ v0, weekend-spike maturity. Known sharp edges, honestly stated:
 - **Function wake latency** depends on the image; the proxy waits up to 15s
   for the container to answer before giving up.
 
+## Feedback
+
+slab is young and shaped by whoever actually runs it. If something broke,
+confused you, or made you wish for one more verb:
+
+- `slab feedback "the trunk thing confused me"` — opens a prefilled issue
+- [issues](https://github.com/jasonmimick/slab/issues) for bugs and ideas ·
+  [discussions](https://github.com/jasonmimick/slab/discussions) to **show
+  your rack** (skins, clusters, weird setups welcome)
+- want `--target fly|gcp`? [claim a provider](CONTRIBUTING.md)
+
 ## Hacking on slab itself
 
 ```bash

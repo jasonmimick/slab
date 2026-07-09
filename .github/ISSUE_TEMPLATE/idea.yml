@@ -1,0 +1,15 @@
+name: idea
+description: a feature, a rough edge, a "why doesn't it just…"
+labels: [idea]
+body:
+  - type: textarea
+    attributes:
+      label: the itch
+      description: what were you trying to do when you wanted this?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: how you imagine it
+      description: a command line, a manifest field, a dashboard gesture — sketch it
+      placeholder: "slab ..."
