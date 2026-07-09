@@ -12,7 +12,7 @@ dashboard, or AI agents speaking MCP.
 
 *one machine · one daemon · zero cloud accounts*
 
-**[runslab.github.io/slab](https://runslab.github.io/slab/)** · [docs](docs/README.md) · [install](#install)
+**[runslab.run](https://runslab.run/)** · [docs](docs/README.md) · [install](#install)
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/runslab/slab?quickstart=1)
 
