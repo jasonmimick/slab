@@ -304,8 +304,15 @@ async function main(): Promise<void> {
       }
 
       const secrets = getSecrets(record.name)
-      // Merge order: manifest.env < wires < secrets < DATABASE_URL
-      const env: Record<string, string> = { ...record.manifest.env, ...wireEnv, ...secrets }
+      // Merge order: PORT < manifest.env < wires < secrets < DATABASE_URL.
+      // PORT always reflects manifest.port so apps that read it listen where
+      // slab expects (previously only inferred manifests got it).
+      const env: Record<string, string> = {
+        PORT: String(record.manifest.port),
+        ...record.manifest.env,
+        ...wireEnv,
+        ...secrets,
+      }
       if (record.manifest.postgres) {
         env.DATABASE_URL = await engine.ensurePostgres(record.name)
       }

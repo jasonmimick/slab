@@ -56,7 +56,8 @@ State lives in `~/.slab/`: `state.json` (app/system records),
 
 No slab.toml? Any dir/repo with a Dockerfile deploys anyway: name from the
 dir, type service, port from first `EXPOSE` (default 3000). `PORT` is always
-injected. Env merge order: **manifest.env < wires < secrets < DATABASE_URL**.
+injected from `manifest.port`. Env merge order:
+**PORT < manifest.env < wires < secrets < DATABASE_URL**.
 
 Every deploy **removes and recreates** the container
 (`removeExistingContainers` → `createContainer` in engine.ts) — the writable
