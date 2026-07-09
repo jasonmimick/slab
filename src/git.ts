@@ -10,7 +10,7 @@ export function looksLikeGitUrl(s: string): boolean {
   return /^(https?:\/\/|git@|file:\/\/)/.test(s) || /^[\w.-]+\/[\w.-]+$/.test(s) && !fs.existsSync(s)
 }
 
-// "jasonmimick/slab" -> full URL; anything else passes through
+// "runslab/slab" -> full URL; anything else passes through
 export function normalizeGitUrl(s: string): string {
   if (/^[\w.-]+\/[\w.-]+$/.test(s)) return `https://github.com/${s}.git`
   return s

@@ -677,7 +677,7 @@ program
       '---',
       `slab ${version} · ${os.platform()}/${os.arch()} · node ${process.version}`,
     ].join('\n')
-    const url = `https://github.com/jasonmimick/slab/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
+    const url = `https://github.com/runslab/slab/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
     const opener = os.platform() === 'darwin' ? 'open' : 'xdg-open'
     try { execSync(`${opener} ${JSON.stringify(url)}`, { stdio: 'ignore' }) } catch { /* headless — the url below still works */ }
     console.log('opening a prefilled issue — or paste this url:')

@@ -12,9 +12,9 @@ dashboard, or AI agents speaking MCP.
 
 *one machine · one daemon · zero cloud accounts*
 
-**[jasonmimick.github.io/slab](https://jasonmimick.github.io/slab/)** · [docs](docs/README.md) · [install](#install)
+**[runslab.github.io/slab](https://runslab.github.io/slab/)** · [docs](docs/README.md) · [install](#install)
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/jasonmimick/slab?quickstart=1)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/runslab/slab?quickstart=1)
 
 *↑ try slab in your browser — no install. Docker-in-Docker in a free Codespace: the daemon boots, the rack seeds itself, open port 7766.*
 
@@ -36,7 +36,7 @@ dashboard, or AI agents speaking MCP.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jasonmimick/slab/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/runslab/slab/master/install.sh | bash
 ```
 
 The installer checks your prerequisites (and tells you exactly how to fix
@@ -154,15 +154,15 @@ slab is young and shaped by whoever actually runs it. If something broke,
 confused you, or made you wish for one more verb:
 
 - `slab feedback "the trunk thing confused me"` — opens a prefilled issue
-- [issues](https://github.com/jasonmimick/slab/issues) for bugs and ideas ·
-  [discussions](https://github.com/jasonmimick/slab/discussions) to **show
+- [issues](https://github.com/runslab/slab/issues) for bugs and ideas ·
+  [discussions](https://github.com/runslab/slab/discussions) to **show
   your rack** (skins, clusters, weird setups welcome)
 - want `--target fly|gcp`? [claim a provider](CONTRIBUTING.md)
 
 ## Hacking on slab itself
 
 ```bash
-git clone https://github.com/jasonmimick/slab.git && cd slab
+git clone https://github.com/runslab/slab.git && cd slab
 npm install && npm run build
 node dist/daemon.js          # api :7766 + ingress :8080
 node dist/cli.js deploy examples/hello-fn

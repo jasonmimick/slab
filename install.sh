@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # slab installer — the localhost hyperscaler
 #
-#   curl -fsSL https://raw.githubusercontent.com/jasonmimick/slab/master/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/runslab/slab/master/install.sh | bash
 #
 # What it does: checks prerequisites (git, node >= 20, docker), clones slab
 # to ~/.slab/src (or pulls if already there), builds it, puts `slab` on your
@@ -10,7 +10,7 @@
 # Overrides: SLAB_REPO (git url), SLAB_HOME (default ~/.slab), SLAB_NO_START=1
 set -euo pipefail
 
-REPO="${SLAB_REPO:-https://github.com/jasonmimick/slab.git}"
+REPO="${SLAB_REPO:-https://github.com/runslab/slab.git}"
 SLAB_HOME="${SLAB_HOME:-$HOME/.slab}"
 SRC="$SLAB_HOME/src"
 

@@ -6,7 +6,7 @@ issue first for anything bigger than a fix so we don't collide.
 ## dev setup
 
 ```bash
-git clone https://github.com/jasonmimick/slab.git && cd slab
+git clone https://github.com/runslab/slab.git && cd slab
 npm install
 npm run build          # tsc + a parse-check of the dashboard's embedded JS
 node dist/daemon.js    # api :7766 · ingress :8080 (needs docker running)

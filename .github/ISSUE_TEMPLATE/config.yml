@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: show your rack
-    url: https://github.com/jasonmimick/slab/discussions
+    url: https://github.com/runslab/slab/discussions
     about: screenshots of your rack, custom skins, cluster setups — discussions is the place

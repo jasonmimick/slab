@@ -3,7 +3,7 @@
 ## install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jasonmimick/slab/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/runslab/slab/master/install.sh | bash
 ```
 
 The installer checks prerequisites (Docker with the engine running,
@@ -159,7 +159,7 @@ Everything is under `~/.slab` (override: `SLAB_DIR`):
 ## hacking on slab itself
 
 ```bash
-git clone https://github.com/jasonmimick/slab.git && cd slab
+git clone https://github.com/runslab/slab.git && cd slab
 npm install && npm run build
 node dist/daemon.js          # api :7766 + ingress :8080
 node dist/cli.js deploy examples/hello-fn
