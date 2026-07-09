@@ -93,7 +93,10 @@ export function createProxy(deps: ProxyDeps): http.Server {
         return
       }
       onRequest(name)
-      proxy.web(req, res, { target: `http://${app.endpoint}` }, (err) => {
+      // endpoints may be full https urls (app runner / lambda function urls) —
+      // changeOrigin so the Host header matches the substrate's domain
+      const target = app.endpoint.startsWith('http') ? app.endpoint : `http://${app.endpoint}`
+      proxy.web(req, res, { target, changeOrigin: true, secure: true }, (err) => {
         if (!res.headersSent) sendJson(res, 502, { error: `proxy error (${app.target}): ${err.message}` })
       })
       return

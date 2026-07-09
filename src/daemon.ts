@@ -262,12 +262,12 @@ async function main(): Promise<void> {
           console.warn(`"${record.name}": functions aren't supported on ${target} — running as an always-on service`)
         }
         const env = { ...record.manifest.env, ...getSecrets(record.name) }
-        // Prebuilt images: hand the ref straight to the substrate — it pulls
-        // the multi-arch manifest itself and picks its own platform. Only
-        // Dockerfile apps build locally and push.
-        const image = record.manifest.image
-          ? record.manifest.image
-          : await provider.prepareImage(record, await engine.buildImage(record))
+        // Providers with substrate constraints (arch, registry) own the whole
+        // image story via resolveImage; otherwise prebuilt refs pass through
+        // and Dockerfile apps build locally + push.
+        const image = provider.resolveImage
+          ? await provider.resolveImage(record)
+          : record.manifest.image ?? await provider.prepareImage(record, await engine.buildImage(record))
         const { ref, endpoint } = await provider.deploy(record, image, env)
         record.target = target
         record.ref = ref

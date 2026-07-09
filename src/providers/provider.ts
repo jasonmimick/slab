@@ -31,6 +31,11 @@ export interface Provider {
   // the remote ref.
   prepareImage(app: AppRecord, localTag: string): Promise<string>
 
+  // Optional: own the WHOLE image story (build/pull/push) when the substrate
+  // has constraints the default flow can't express — e.g. aws needs amd64 in
+  // ECR for App Runner/Lambda regardless of the local machine's arch.
+  resolveImage?(app: AppRecord): Promise<string>
+
   deploy(app: AppRecord, image: string, env: Record<string, string>): Promise<{ ref: string; endpoint: string | null }>
   stop(app: AppRecord): Promise<void>
   start(app: AppRecord): Promise<{ endpoint: string | null }>

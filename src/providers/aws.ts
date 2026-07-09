@@ -1,25 +1,35 @@
-// slab — aws provider (v1: services only). Renders apps onto ECS Fargate:
-// image pushed to ECR, one task definition + service per app, logs in
-// CloudWatch, endpoint = the task's public IP.
+// slab — aws provider. One target, three substrates, routed by the manifest's
+// own intent (the user never picks an AWS service):
+//
+//   type = "service" (public)  -> App Runner   stable random https url, pause/resume
+//   type = "function"          -> Lambda       container image + Function URL, true scale-to-zero
+//   public = false             -> Fargate      BETA — vpc/system isolation story is unfinished
+//
+// Images: everything is built/pulled as linux/amd64 and pushed to ECR —
+// App Runner and Lambda can only pull ECR, and uniform arch kills the
+// CannotPullContainerError class of bugs on arm64 laptops for good.
 //
 // AUTH: slab holds no credentials. Every call shells out to the operator's
-// own `aws` CLI, so it runs as whatever identity they already have —
-// aws configure keys, an SSO profile, env vars, or an EC2 instance role
-// when the daemon lives in EC2. ~/.slab/providers.toml names a profile and
-// region at most; never secrets. Everything is created in the user's
-// account: cluster `slab`, role `slabEcsExecutionRole`, SG `slab-<port>`,
-// repo `slab/<app>`, log group `/slab/<app>`, service `slab-<app>`.
+// own `aws` CLI (configure/SSO/env, or the EC2 instance role when the daemon
+// runs in EC2). ~/.slab/providers.toml names a profile/region at most.
+// In-account roles created (all slab-prefixed, standard service trust, no
+// cross-account/ExternalId anything): slabEcsExecutionRole,
+// slabLambdaExecutionRole, slabAppRunnerAccessRole.
 import fs from 'fs'
 import path from 'path'
-import { execFile, spawn } from 'child_process'
+import { execFile } from 'child_process'
 import { parse } from 'smol-toml'
 import { AppRecord } from '../types'
 import { slabDir } from '../state'
 import { Provider } from './provider'
 
-const EXEC_ROLE = 'slabEcsExecutionRole'
-const DEPLOY_WAIT_MS = 240_000
+const ECS_EXEC_ROLE = 'slabEcsExecutionRole'
+const LAMBDA_ROLE = 'slabLambdaExecutionRole'
+const APPRUNNER_ROLE = 'slabAppRunnerAccessRole'
+const DEPLOY_WAIT_MS = 360_000
 const POLL_MS = 5_000
+
+type Substrate = 'apprunner' | 'lambda' | 'fargate'
 
 interface AwsConfig {
   region?: string
@@ -32,8 +42,7 @@ interface AwsConfig {
 function loadConfig(): AwsConfig {
   let raw: Record<string, unknown> = {}
   try {
-    const file = path.join(slabDir(), 'providers.toml')
-    raw = (parse(fs.readFileSync(file, 'utf-8')) as Record<string, unknown>)
+    raw = parse(fs.readFileSync(path.join(slabDir(), 'providers.toml'), 'utf-8')) as Record<string, unknown>
   } catch { /* no config file — defaults + ambient credentials */ }
   const aws = (raw.aws ?? {}) as Record<string, unknown>
   return {
@@ -47,7 +56,7 @@ function loadConfig(): AwsConfig {
 
 function run(cmd: string, args: string[], input?: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile(cmd, args, { timeout: 180_000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
+    const child = execFile(cmd, args, { timeout: 300_000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         const detail = (stderr || err.message || '').trim().split('\n').slice(0, 3).join(' ')
         reject(new Error(`${cmd} ${args.slice(0, 3).join(' ')}… failed: ${detail}`))
@@ -64,6 +73,20 @@ function run(cmd: string, args: string[], input?: string): Promise<string> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+// Which AWS service carries this app — decided by manifest intent alone
+function substrateFor(app: AppRecord): Substrate {
+  if (app.manifest.type === 'function') return 'lambda'
+  if (app.manifest.public === false) return 'fargate'
+  return 'apprunner'
+}
+
+function parseRef(ref: string | null | undefined): { kind: Substrate | null; id: string } {
+  if (!ref) return { kind: null, id: '' }
+  const i = ref.indexOf(':')
+  if (i < 0) return { kind: 'fargate', id: ref }   // pre-routing refs were fargate
+  return { kind: ref.slice(0, i) as Substrate, id: ref.slice(i + 1) }
 }
 
 export function createAwsProvider(): Provider {
@@ -85,7 +108,6 @@ export function createAwsProvider(): Provider {
     try { return JSON.parse(out) } catch { return out }
   }
 
-  // Tolerate idempotency errors ("already exists") — everything ensure-shaped
   async function awsTolerate(args: string[], pattern: RegExp): Promise<any> {
     try {
       return await aws(args)
@@ -121,31 +143,172 @@ export function createAwsProvider(): Provider {
     readyChecked = true
   }
 
-  // ── ensure-shaped primitives (all idempotent, all in the user's account) ──
+  // ── roles: in-account, service-principal trust only ──────────────────────
 
-  async function ensureCluster(): Promise<void> {
-    await aws(['ecs', 'create-cluster', '--cluster-name', cfg.cluster])
-  }
-
-  async function ensureExecutionRole(): Promise<string> {
+  async function ensureRole(name: string, service: string, policyArn: string, description: string): Promise<string> {
     try {
-      const r = await aws(['iam', 'get-role', '--role-name', EXEC_ROLE])
+      const r = await aws(['iam', 'get-role', '--role-name', name])
       return r.Role.Arn
     } catch { /* create below */ }
     const trust = JSON.stringify({
       Version: '2012-10-17',
-      Statement: [{ Effect: 'Allow', Principal: { Service: 'ecs-tasks.amazonaws.com' }, Action: 'sts:AssumeRole' }],
+      Statement: [{ Effect: 'Allow', Principal: { Service: service }, Action: 'sts:AssumeRole' }],
     })
-    const created = await aws(['iam', 'create-role', '--role-name', EXEC_ROLE,
-      '--assume-role-policy-document', trust,
-      '--description', 'slab: lets Fargate pull ECR images and write CloudWatch logs'])
-    await awsTolerate(['iam', 'attach-role-policy', '--role-name', EXEC_ROLE,
-      '--policy-arn', 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'], /./)
-    await sleep(8000)   // IAM propagation before first register-task-definition
+    const created = await aws(['iam', 'create-role', '--role-name', name,
+      '--assume-role-policy-document', trust, '--description', description])
+    await awsTolerate(['iam', 'attach-role-policy', '--role-name', name, '--policy-arn', policyArn], /./)
+    await sleep(10_000)   // IAM propagation before first use
     return created.Role.Arn
   }
 
-  async function ensureLogGroup(app: AppRecord): Promise<string> {
+  // ── images: uniform linux/amd64 in ECR ────────────────────────────────────
+
+  async function ensureRepo(app: AppRecord): Promise<string> {
+    const name = `slab/${app.name}`
+    try {
+      const r = await aws(['ecr', 'describe-repositories', '--repository-names', name])
+      return r.repositories[0].repositoryUri
+    } catch {
+      const r = await aws(['ecr', 'create-repository', '--repository-name', name])
+      return r.repository.repositoryUri
+    }
+  }
+
+  async function ecrLogin(): Promise<void> {
+    const registry = `${accountId}.dkr.ecr.${region}.amazonaws.com`
+    const pwArgs = ['ecr', 'get-login-password', '--region', region!]
+    if (cfg.profile) pwArgs.push('--profile', cfg.profile)
+    const password = (await run('aws', pwArgs)).trim()
+    await run('docker', ['login', '--username', 'AWS', '--password-stdin', registry], password)
+  }
+
+  async function resolveImage(app: AppRecord): Promise<string> {
+    await ready()
+    const repoUri = await ensureRepo(app)
+    await ecrLogin()
+    const remote = `${repoUri}:v${app.version + 1}`
+    if (app.manifest.image) {
+      await run('docker', ['pull', '--platform', 'linux/amd64', app.manifest.image])
+      await run('docker', ['tag', app.manifest.image, remote])
+    } else {
+      await run('docker', ['build', '--platform', 'linux/amd64', '-t', remote, app.sourceDir])
+    }
+    await run('docker', ['push', remote])
+    return remote
+  }
+
+  // legacy interface method — resolveImage supersedes it for this provider
+  async function prepareImage(app: AppRecord, _localTag: string): Promise<string> {
+    return resolveImage(app)
+  }
+
+  // ── app runner: public services ───────────────────────────────────────────
+
+  async function apprunnerFind(app: AppRecord): Promise<{ arn: string; status: string; url: string | null } | null> {
+    const r = await aws(['apprunner', 'list-services'])
+    const svc = (r.ServiceSummaryList ?? []).find((s: { ServiceName: string }) => s.ServiceName === `slab-${app.name}`)
+    if (!svc) return null
+    return { arn: svc.ServiceArn, status: svc.Status, url: svc.ServiceUrl ?? null }
+  }
+
+  async function apprunnerWait(arn: string, want: string[]): Promise<any> {
+    const deadline = Date.now() + DEPLOY_WAIT_MS
+    while (Date.now() < deadline) {
+      const d = await aws(['apprunner', 'describe-service', '--service-arn', arn])
+      const s = d.Service
+      if (want.includes(s.Status)) return s
+      if (s.Status === 'CREATE_FAILED') throw new Error('app runner service creation failed — check the AWS console for the operation log')
+      await sleep(POLL_MS)
+    }
+    throw new Error(`app runner service did not reach ${want.join('/')} within ${DEPLOY_WAIT_MS / 1000}s`)
+  }
+
+  function apprunnerSource(app: AppRecord, image: string, env: Record<string, string>, roleArn: string) {
+    return {
+      ImageRepository: {
+        ImageIdentifier: image,
+        ImageRepositoryType: 'ECR',
+        ImageConfiguration: {
+          Port: String(app.manifest.port),
+          RuntimeEnvironmentVariables: env,
+        },
+      },
+      AutoDeploymentsEnabled: false,
+      AuthenticationConfiguration: { AccessRoleArn: roleArn },
+    }
+  }
+
+  async function apprunnerDeploy(app: AppRecord, image: string, env: Record<string, string>): Promise<{ ref: string; endpoint: string | null }> {
+    const roleArn = await ensureRole(APPRUNNER_ROLE, 'build.apprunner.amazonaws.com',
+      'arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess',
+      'slab: lets App Runner pull slab images from ECR')
+    const existing = await apprunnerFind(app)
+    let arn: string
+    if (existing) {
+      arn = existing.arn
+      if (existing.status === 'PAUSED') {
+        await aws(['apprunner', 'resume-service', '--service-arn', arn])
+        await apprunnerWait(arn, ['RUNNING'])
+      }
+      await aws(['apprunner', 'update-service', '--service-arn', arn,
+        '--source-configuration', JSON.stringify(apprunnerSource(app, image, env, roleArn))])
+    } else {
+      const created = await aws(['apprunner', 'create-service', '--service-name', `slab-${app.name}`,
+        '--source-configuration', JSON.stringify(apprunnerSource(app, image, env, roleArn)),
+        '--instance-configuration', JSON.stringify({ Cpu: '0.25 vCPU', Memory: '0.5 GB' })])
+      arn = created.Service.ServiceArn
+    }
+    const svc = await apprunnerWait(arn, ['RUNNING'])
+    return { ref: `apprunner:${arn}`, endpoint: svc.ServiceUrl ? `https://${svc.ServiceUrl}` : null }
+  }
+
+  // ── lambda: functions ─────────────────────────────────────────────────────
+
+  async function lambdaDeploy(app: AppRecord, image: string, env: Record<string, string>): Promise<{ ref: string; endpoint: string | null }> {
+    console.warn(`"${app.name}": lambda containers must speak the runtime api — plain web images need the aws-lambda-web-adapter (one COPY line; docs/providers/aws.md)`)
+    const roleArn = await ensureRole(LAMBDA_ROLE, 'lambda.amazonaws.com',
+      'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
+      'slab: lambda execution (logs)')
+    const fn = `slab-${app.name}`
+    // the web adapter reads PORT / AWS_LWA_PORT to find the app inside the image
+    const fullEnv = { PORT: String(app.manifest.port), AWS_LWA_PORT: String(app.manifest.port), ...env }
+    let exists = true
+    try { await aws(['lambda', 'get-function', '--function-name', fn]) } catch { exists = false }
+    if (exists) {
+      await aws(['lambda', 'update-function-code', '--function-name', fn, '--image-uri', image])
+      await aws(['lambda', 'wait', 'function-updated-v2', '--function-name', fn])
+      await aws(['lambda', 'update-function-configuration', '--function-name', fn,
+        '--cli-input-json', JSON.stringify({ FunctionName: fn, Environment: { Variables: fullEnv }, MemorySize: Number(cfg.memory), Timeout: 60 })])
+      await aws(['lambda', 'wait', 'function-updated-v2', '--function-name', fn])
+      await awsTolerate(['lambda', 'delete-function-concurrency', '--function-name', fn], /./)   // was stopped? wake it
+    } else {
+      await aws(['lambda', 'create-function', '--cli-input-json', JSON.stringify({
+        FunctionName: fn,
+        PackageType: 'Image',
+        Code: { ImageUri: image },
+        Role: roleArn,
+        MemorySize: Number(cfg.memory),
+        Timeout: 60,
+        Environment: { Variables: fullEnv },
+        Architectures: ['x86_64'],
+      })])
+      await aws(['lambda', 'wait', 'function-active-v2', '--function-name', fn])
+    }
+    await awsTolerate(['lambda', 'create-function-url-config', '--function-name', fn, '--auth-type', 'NONE'], /exists/i)
+    await awsTolerate(['lambda', 'add-permission', '--function-name', fn, '--statement-id', 'slab-url',
+      '--action', 'lambda:InvokeFunctionUrl', '--principal', '*', '--function-url-auth-type', 'NONE'], /exists|Conflict/i)
+    const url = await aws(['lambda', 'get-function-url-config', '--function-name', fn])
+    const endpoint = url?.FunctionUrl ? String(url.FunctionUrl).replace(/\/$/, '') : null
+    return { ref: `lambda:${fn}`, endpoint }
+  }
+
+  // ── fargate: public = false (BETA — kept for the future systems story) ────
+
+  async function fargateEnsureCluster(): Promise<void> {
+    await aws(['ecs', 'create-cluster', '--cluster-name', cfg.cluster])
+  }
+
+  async function fargateEnsureLogGroup(app: AppRecord): Promise<string> {
     const name = `/slab/${app.name}`
     await awsTolerate(['logs', 'create-log-group', '--log-group-name', name], /ResourceAlreadyExists/)
     return name
@@ -154,11 +317,11 @@ export function createAwsProvider(): Provider {
   async function defaultVpc(): Promise<string> {
     const r = await aws(['ec2', 'describe-vpcs', '--filters', 'Name=is-default,Values=true'])
     const vpc = r.Vpcs?.[0]?.VpcId
-    if (!vpc) throw new Error('no default VPC in this region — v1 of the aws provider uses the default VPC (set [aws] region to one that has it)')
+    if (!vpc) throw new Error('no default VPC in this region — the fargate (public=false) beta uses the default VPC')
     return vpc
   }
 
-  async function ensureSecurityGroup(port: number): Promise<string> {
+  async function fargateSecurityGroup(port: number): Promise<string> {
     const vpc = await defaultVpc()
     const name = `slab-${port}`
     const found = await aws(['ec2', 'describe-security-groups', '--filters',
@@ -166,7 +329,7 @@ export function createAwsProvider(): Provider {
     let sgId = found.SecurityGroups?.[0]?.GroupId
     if (!sgId) {
       const created = await aws(['ec2', 'create-security-group', '--group-name', name,
-        '--description', `slab: public ingress on ${port}`, '--vpc-id', vpc])
+        '--description', `slab: ingress on ${port}`, '--vpc-id', vpc])
       sgId = created.GroupId
     }
     await awsTolerate(['ec2', 'authorize-security-group-ingress', '--group-id', sgId,
@@ -182,48 +345,7 @@ export function createAwsProvider(): Provider {
     return ids.slice(0, 3)
   }
 
-  async function ensureRepo(app: AppRecord): Promise<string> {
-    const name = `slab/${app.name}`
-    try {
-      const r = await aws(['ecr', 'describe-repositories', '--repository-names', name])
-      return r.repositories[0].repositoryUri
-    } catch {
-      const r = await aws(['ecr', 'create-repository', '--repository-name', name])
-      return r.repository.repositoryUri
-    }
-  }
-
-  async function prepareImage(app: AppRecord, localTag: string): Promise<string> {
-    await ready()
-    const repoUri = await ensureRepo(app)
-    const registry = `${accountId}.dkr.ecr.${region}.amazonaws.com`
-    const pwArgs = ['ecr', 'get-login-password', '--region', region!]
-    if (cfg.profile) pwArgs.push('--profile', cfg.profile)
-    const password = (await run('aws', pwArgs)).trim()
-    await run('docker', ['login', '--username', 'AWS', '--password-stdin', registry], password)
-    const remote = `${repoUri}:v${app.version + 1}`
-    await run('docker', ['tag', localTag, remote])
-    await run('docker', ['push', remote])
-    return remote
-  }
-
-  // Built-and-pushed images are single-arch (whatever the local machine is —
-  // arm64 on apple silicon). Fargate defaults to amd64, so the task's
-  // runtimePlatform must match the image or placement fails with
-  // CannotPullContainerError. Registry-ref images (docker hub) are usually
-  // multi-arch — omit runtimePlatform and let Fargate pick.
-  async function imageArch(image: string): Promise<string | null> {
-    try {
-      const out = await run('docker', ['image', 'inspect', '--format', '{{.Architecture}}', image])
-      const arch = out.trim()
-      return arch === 'arm64' ? 'ARM64' : arch === 'amd64' ? 'X86_64' : null
-    } catch {
-      return null   // not in the local store (e.g. a hub ref) — let Fargate default
-    }
-  }
-
-  async function registerTaskDef(app: AppRecord, image: string, env: Record<string, string>, roleArn: string, logGroup: string): Promise<string> {
-    const arch = await imageArch(image)
+  async function fargateTaskDef(app: AppRecord, image: string, env: Record<string, string>, roleArn: string, logGroup: string): Promise<string> {
     const def = {
       family: `slab-${app.name}`,
       requiresCompatibilities: ['FARGATE'],
@@ -231,7 +353,7 @@ export function createAwsProvider(): Provider {
       cpu: cfg.cpu,
       memory: cfg.memory,
       executionRoleArn: roleArn,
-      ...(arch ? { runtimePlatform: { cpuArchitecture: arch, operatingSystemFamily: 'LINUX' } } : {}),
+      runtimePlatform: { cpuArchitecture: 'X86_64', operatingSystemFamily: 'LINUX' },   // images are uniformly amd64
       containerDefinitions: [{
         name: app.name,
         image,
@@ -248,16 +370,13 @@ export function createAwsProvider(): Provider {
     return r.taskDefinition.taskDefinitionArn
   }
 
-  async function serviceState(app: AppRecord): Promise<{ exists: boolean; running: number; desired: number }> {
+  async function fargateServiceState(app: AppRecord): Promise<{ exists: boolean; running: number }> {
     const r = await aws(['ecs', 'describe-services', '--cluster', cfg.cluster, '--services', `slab-${app.name}`])
     const svc = (r.services ?? []).find((s: { status: string }) => s.status !== 'INACTIVE')
-    if (!svc) return { exists: false, running: 0, desired: 0 }
-    return { exists: true, running: svc.runningCount ?? 0, desired: svc.desiredCount ?? 0 }
+    return svc ? { exists: true, running: svc.runningCount ?? 0 } : { exists: false, running: 0 }
   }
 
-  // The endpoint is the running task's public IP + the app port. It changes
-  // when the task is replaced — status() refreshes it.
-  async function taskEndpoint(app: AppRecord): Promise<string | null> {
+  async function fargateEndpoint(app: AppRecord): Promise<string | null> {
     const tasks = await aws(['ecs', 'list-tasks', '--cluster', cfg.cluster, '--service-name', `slab-${app.name}`, '--desired-status', 'RUNNING'])
     const arn = tasks.taskArns?.[0]
     if (!arn) return null
@@ -272,26 +391,18 @@ export function createAwsProvider(): Provider {
     return ip ? `${ip}:${app.manifest.port}` : null
   }
 
-  async function waitForEndpoint(app: AppRecord): Promise<string | null> {
-    const deadline = Date.now() + DEPLOY_WAIT_MS
-    while (Date.now() < deadline) {
-      const ep = await taskEndpoint(app)
-      if (ep) return ep
-      await sleep(POLL_MS)
-    }
-    return null   // service exists; task still pending — status() picks it up later
-  }
-
-  async function deploy(app: AppRecord, image: string, env: Record<string, string>): Promise<{ ref: string; endpoint: string | null }> {
-    await ready()
-    await ensureCluster()
-    const roleArn = await ensureExecutionRole()
-    const logGroup = await ensureLogGroup(app)
-    const taskDefArn = await registerTaskDef(app, image, env, roleArn, logGroup)
-    const sg = await ensureSecurityGroup(app.manifest.port)
+  async function fargateDeploy(app: AppRecord, image: string, env: Record<string, string>): Promise<{ ref: string; endpoint: string | null }> {
+    console.warn(`"${app.name}": public=false on aws runs on fargate — BETA, the isolation/systems story is unfinished`)
+    await fargateEnsureCluster()
+    const roleArn = await ensureRole(ECS_EXEC_ROLE, 'ecs-tasks.amazonaws.com',
+      'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy',
+      'slab: lets Fargate pull ECR images and write CloudWatch logs')
+    const logGroup = await fargateEnsureLogGroup(app)
+    const taskDefArn = await fargateTaskDef(app, image, env, roleArn, logGroup)
+    const sg = await fargateSecurityGroup(app.manifest.port)
     const subnets = await defaultSubnets()
-    const svc = await serviceState(app)
     const netCfg = `awsvpcConfiguration={subnets=[${subnets.join(',')}],securityGroups=[${sg}],assignPublicIp=ENABLED}`
+    const svc = await fargateServiceState(app)
     if (svc.exists) {
       await aws(['ecs', 'update-service', '--cluster', cfg.cluster, '--service', `slab-${app.name}`,
         '--task-definition', taskDefArn, '--desired-count', '1', '--network-configuration', netCfg])
@@ -300,46 +411,134 @@ export function createAwsProvider(): Provider {
         '--task-definition', taskDefArn, '--desired-count', '1', '--launch-type', 'FARGATE',
         '--network-configuration', netCfg])
     }
-    const endpoint = await waitForEndpoint(app)
-    return { ref: `${cfg.cluster}/slab-${app.name}`, endpoint }
+    const deadline = Date.now() + DEPLOY_WAIT_MS
+    let endpoint: string | null = null
+    while (Date.now() < deadline && !endpoint) {
+      endpoint = await fargateEndpoint(app)
+      if (!endpoint) await sleep(POLL_MS)
+    }
+    return { ref: `fargate:${cfg.cluster}/slab-${app.name}`, endpoint }
+  }
+
+  // ── the router ────────────────────────────────────────────────────────────
+
+  async function deploy(app: AppRecord, image: string, env: Record<string, string>): Promise<{ ref: string; endpoint: string | null }> {
+    await ready()
+    const want = substrateFor(app)
+    const prev = parseRef(app.ref)
+    if (prev.kind && prev.kind !== want) {
+      // manifest intent changed (e.g. service -> function): retire the old home
+      await removeOn(prev.kind, app).catch(() => { /* best-effort */ })
+    }
+    if (want === 'apprunner') return apprunnerDeploy(app, image, env)
+    if (want === 'lambda') return lambdaDeploy(app, image, env)
+    return fargateDeploy(app, image, env)
+  }
+
+  async function removeOn(kind: Substrate, app: AppRecord): Promise<void> {
+    if (kind === 'apprunner') {
+      const svc = await apprunnerFind(app)
+      if (svc) await aws(['apprunner', 'delete-service', '--service-arn', svc.arn])
+    } else if (kind === 'lambda') {
+      await awsTolerate(['lambda', 'delete-function', '--function-name', `slab-${app.name}`], /ResourceNotFound/)
+    } else {
+      await awsTolerate(['ecs', 'update-service', '--cluster', cfg.cluster, '--service', `slab-${app.name}`, '--desired-count', '0'], /ServiceNotFound|ClusterNotFound/)
+      await awsTolerate(['ecs', 'delete-service', '--cluster', cfg.cluster, '--service', `slab-${app.name}`, '--force'], /ServiceNotFound|ClusterNotFound/)
+    }
   }
 
   async function stop(app: AppRecord): Promise<void> {
     await ready()
-    await aws(['ecs', 'update-service', '--cluster', cfg.cluster, '--service', `slab-${app.name}`, '--desired-count', '0'])
+    const { kind } = parseRef(app.ref)
+    if (kind === 'apprunner') {
+      const svc = await apprunnerFind(app)
+      if (svc) {
+        await aws(['apprunner', 'pause-service', '--service-arn', svc.arn])
+        await apprunnerWait(svc.arn, ['PAUSED'])
+      }
+    } else if (kind === 'lambda') {
+      await aws(['lambda', 'put-function-concurrency', '--function-name', `slab-${app.name}`, '--reserved-concurrent-executions', '0'])
+    } else {
+      await aws(['ecs', 'update-service', '--cluster', cfg.cluster, '--service', `slab-${app.name}`, '--desired-count', '0'])
+    }
   }
 
   async function start(app: AppRecord): Promise<{ endpoint: string | null }> {
     await ready()
+    const { kind } = parseRef(app.ref)
+    if (kind === 'apprunner') {
+      const svc = await apprunnerFind(app)
+      if (!svc) return { endpoint: null }
+      await aws(['apprunner', 'resume-service', '--service-arn', svc.arn])
+      const s = await apprunnerWait(svc.arn, ['RUNNING'])
+      return { endpoint: s.ServiceUrl ? `https://${s.ServiceUrl}` : null }
+    }
+    if (kind === 'lambda') {
+      await awsTolerate(['lambda', 'delete-function-concurrency', '--function-name', `slab-${app.name}`], /ResourceNotFound/)
+      return { endpoint: app.endpoint ?? null }
+    }
     await aws(['ecs', 'update-service', '--cluster', cfg.cluster, '--service', `slab-${app.name}`, '--desired-count', '1'])
-    return { endpoint: await waitForEndpoint(app) }
+    const deadline = Date.now() + DEPLOY_WAIT_MS
+    while (Date.now() < deadline) {
+      const ep = await fargateEndpoint(app)
+      if (ep) return { endpoint: ep }
+      await sleep(POLL_MS)
+    }
+    return { endpoint: null }
   }
 
   async function remove(app: AppRecord): Promise<void> {
     await ready()
-    await awsTolerate(['ecs', 'update-service', '--cluster', cfg.cluster, '--service', `slab-${app.name}`, '--desired-count', '0'], /ServiceNotFound|ClusterNotFound/)
-    await awsTolerate(['ecs', 'delete-service', '--cluster', cfg.cluster, '--service', `slab-${app.name}`, '--force'], /ServiceNotFound|ClusterNotFound/)
-    // Kept on purpose (cheap, and useful history): ECR repo, log group, task
-    // definitions, the shared cluster/role/SG — documented in docs/providers/aws.md
+    const { kind } = parseRef(app.ref)
+    await removeOn(kind ?? substrateFor(app), app)
   }
 
   async function status(app: AppRecord): Promise<{ state: 'running' | 'stopped' | 'unknown'; endpoint?: string | null }> {
     await ready()
+    const { kind } = parseRef(app.ref)
     try {
-      const svc = await serviceState(app)
+      if (kind === 'apprunner') {
+        const svc = await apprunnerFind(app)
+        if (!svc) return { state: 'unknown' }
+        if (svc.status === 'RUNNING') return { state: 'running', endpoint: svc.url ? `https://${svc.url}` : app.endpoint ?? null }
+        if (svc.status === 'PAUSED') return { state: 'stopped' }
+        return { state: 'unknown' }
+      }
+      if (kind === 'lambda') {
+        try {
+          const c = await aws(['lambda', 'get-function-concurrency', '--function-name', `slab-${app.name}`])
+          if (c?.ReservedConcurrentExecutions === 0) return { state: 'stopped' }
+        } catch { /* no reserved concurrency set — it's live */ }
+        await aws(['lambda', 'get-function', '--function-name', `slab-${app.name}`])
+        return { state: 'running', endpoint: app.endpoint ?? null }
+      }
+      const svc = await fargateServiceState(app)
       if (!svc.exists) return { state: 'unknown' }
-      if (svc.running > 0) return { state: 'running', endpoint: await taskEndpoint(app) }
+      if (svc.running > 0) return { state: 'running', endpoint: await fargateEndpoint(app) }
       return { state: 'stopped' }
     } catch {
       return { state: 'unknown' }
     }
   }
 
+  async function logGroupFor(app: AppRecord): Promise<string | null> {
+    const { kind } = parseRef(app.ref)
+    if (kind === 'lambda') return `/aws/lambda/slab-${app.name}`
+    if (kind === 'apprunner') {
+      const svc = await apprunnerFind(app)
+      if (!svc) return null
+      const id = svc.arn.split('/').pop()
+      return `/aws/apprunner/slab-${app.name}/${id}/application`
+    }
+    return `/slab/${app.name}`
+  }
+
   async function logs(app: AppRecord, tail: number): Promise<string> {
     await ready()
     try {
-      const r = await aws(['logs', 'filter-log-events', '--log-group-name', `/slab/${app.name}`,
-        '--limit', String(Math.min(1000, tail))])
+      const group = await logGroupFor(app)
+      if (!group) return 'no logs: service not found'
+      const r = await aws(['logs', 'filter-log-events', '--log-group-name', group, '--limit', String(Math.min(1000, tail))])
       const events = (r.events ?? []) as Array<{ timestamp: number; message: string }>
       return events
         .sort((a, b) => a.timestamp - b.timestamp)
@@ -352,9 +551,10 @@ export function createAwsProvider(): Provider {
 
   return {
     name: 'aws',
-    capabilities: { functions: false, jobs: false, systems: false, postgres: false },
+    capabilities: { functions: true, jobs: false, systems: false, postgres: false },
     ready,
     prepareImage,
+    resolveImage,
     deploy,
     stop,
     start,
