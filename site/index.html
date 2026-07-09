@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&display=swap" rel="stylesheet">
 <script>
-  document.documentElement.dataset.skin = localStorage.getItem('slab-site-skin') || 'stereo'
+  document.documentElement.dataset.skin = localStorage.getItem('slab-site-skin') || 'pour'
 </script>
 <style>
   /* palette: the machine room + the pour
@@ -54,16 +54,101 @@
   [data-skin="phosphor"] body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 999;
     background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); }
   [data-skin="phosphor"] .hero h1 { color: #8fe8ac; text-shadow: 0 0 18px rgba(57,255,110,.35); }
+  /* daylight — the hi-fi catalog: brushed aluminum faceplates, LEDs stay lit */
   :root[data-skin="daylight"] {
-    --ink: #e9e6df; --rail: #cfccc5; --well: #0b0c0e;
-    --text: #26272d; --dim: #55575e; --faint: #8b8d93;
-    --amber: #c8791b;
-    --u1: #f7f5f0; --u2: #edebe5; --u3: #e0ded7; --u4: #e8e6df;
-    --edge: #bfbcb4; --line: #d9d6cf; --cheek: #b08a5c;
+    --ink: #f2f0ea; --rail: #dcd9d1; --well: #121316;
+    --text: #26251f; --dim: #55534b; --faint: #8b887f;
+    --amber: #b36a00; --green: #1f8a4c; --blue: #3d77b0;
+    --u1: #e9e7e0; --u2: #dedcd4; --u3: #c8c5bd; --u4: #d5d3cb;
+    --edge: #a9a79f; --line: #d8d5cd; --cheek: #8a6f4e;
   }
   [data-skin="daylight"] .hero h1 { text-shadow: 0 1px 0 #fff, 0 3px 0 #9b9890, 0 5px 0 #7a776f, 0 8px 18px rgba(0,0,0,.25); }
   [data-skin="daylight"] .lcd { color: #ffb454; }
   [data-skin="daylight"] .cabmark { color: #a3651a; }
+  /* pour — daylight structural concrete (default skin) */
+  :root[data-skin="pour"] {
+    --ink: #e7e5df; --rail: #cfccc3; --well: #101113;
+    --text: #26251f; --dim: #55534b; --faint: #8b887f;
+    --amber: #c2410c; --green: #1f8a4c; --blue: #3d6b8e; --red: #c0392b;
+    --u1: #f5f4f0; --u2: #efeee8; --u3: #e3e1da; --u4: #ebe9e2;
+    --edge: #b9b6ad; --line: #d5d2ca; --cheek: transparent;
+  }
+  [data-skin="pour"] body { background-image:
+      radial-gradient(rgba(0,0,0,.045) 1px, transparent 1.4px),
+      radial-gradient(rgba(255,255,255,.6) 1px, transparent 1.4px);
+    background-size: 52px 52px, 67px 67px; background-position: 7px 11px, 31px 39px; }
+  [data-skin="pour"] ::selection { background: #e4570f; color: #fff; }
+  [data-skin="pour"] .hero h1 { color: var(--text);
+    text-shadow: 0 1px 0 #fff, 3px 3px 0 #b9b6ad, 5px 5px 0 rgba(0,0,0,.12); }
+  [data-skin="pour"] .vents { display: none; }
+  [data-skin="pour"] .cabinet { background: linear-gradient(180deg, #f5f4f0, #e9e7e0);
+    border-color: var(--edge); margin: 0; box-shadow: 0 10px 28px rgba(0,0,0,.12); }
+  [data-skin="pour"] nav { border-bottom: 2px solid var(--text); }
+  [data-skin="pour"] .sect-head .rule { border-bottom: 2px solid var(--text); }
+  [data-skin="pour"] .sect-head .tag { font-family: 'American Typewriter', 'Courier New', monospace;
+    border: 1.5px solid var(--edge); background: var(--u1); padding: 3px 10px; border-radius: 3px;
+    transform: rotate(1deg); letter-spacing: .1em; }
+  [data-skin="pour"] footer { border-top: 2px solid var(--text); }
+  [data-skin="pour"] .install { box-shadow: inset 0 1px 6px rgba(0,0,0,.7), 0 2px 0 #fff, 0 6px 18px rgba(0,0,0,.18); }
+  [data-skin="pour"] .install button { background: #e4570f; color: #fff; }
+  [data-skin="pour"] .install button:hover { background: #f26a22; }
+  [data-skin="pour"] .lcd { color: #ffb454; }
+  [data-skin="pour"] .cabmark { color: #a3480e; }
+  [data-skin="pour"] .hero .cabinet, [data-skin="pour"] .cabcap { display: none; }
+  [data-skin="pour"] .sheetlet { display: block; }
+  /* light skins share a daylight bezel + inset highlights */
+  [data-skin="pour"] .pwr, [data-skin="daylight"] .pwr {
+    background: radial-gradient(circle at 35% 30%, #f4f2ec, #c2bfb7 70%); border-color: #a9a79f; }
+  [data-skin="pour"] .pwr::after, [data-skin="daylight"] .pwr::after { background: #b4b1a9; }
+  [data-skin="pour"] .unit, [data-skin="daylight"] .unit {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.85), inset 0 -1px 0 rgba(0,0,0,.18), 0 2px 5px rgba(0,0,0,.1); }
+  [data-skin="pour"] .verbrack pre b, [data-skin="daylight"] .verbrack pre b { color: #71d68d; }
+  [data-skin="pour"] .srow .dots, [data-skin="daylight"] .srow .dots { border-bottom-color: #a9a79f; }
+  /* blueprint — sheet S-1: prussian ground, white line work, redline accent */
+  :root[data-skin="blueprint"] {
+    --ink: #113760; --rail: #16406e; --well: #0e3156;
+    --text: #dce9f5; --dim: #9fbedd; --faint: #6e8fb4;
+    --amber: #ff7a5c; --green: #eaf6ff; --blue: #dce9f5; --red: #ff7a5c;
+    --u1: #16406e; --u2: #16406e; --u3: #14406b; --u4: #123a63;
+    --edge: #3e6a9a; --line: #2a5588; --cheek: transparent;
+    --glass: #dce9f5; --glass-dim: #9fbedd; --glass-faint: #6e8fb4;
+  }
+  [data-skin="blueprint"] body { background-image:
+      linear-gradient(rgba(220,233,245,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(220,233,245,.05) 1px, transparent 1px);
+    background-size: 28px 28px; }
+  [data-skin="blueprint"] body::before { content: ''; position: fixed; inset: 10px;
+    border: 1.5px solid rgba(220,233,245,.55); pointer-events: none; z-index: 998; }
+  [data-skin="blueprint"] ::selection { background: #ff7a5c; color: #113760; }
+  [data-skin="blueprint"] .hero h1 { color: transparent; -webkit-text-stroke: 2px var(--text);
+    text-shadow: 0 0 34px rgba(220,233,245,.25); }
+  @supports not (-webkit-text-stroke: 2px white) {
+    [data-skin="blueprint"] .hero h1 { color: var(--text); }
+  }
+  [data-skin="blueprint"] .vents { display: none; }
+  [data-skin="blueprint"] .cabinet { background: var(--rail); border: 1.5px solid var(--text);
+    margin: 0; box-shadow: none; border-radius: 0; }
+  [data-skin="blueprint"] .rack { box-shadow: none; }
+  [data-skin="blueprint"] .unit, [data-skin="blueprint"] .specsheet, [data-skin="blueprint"] .term,
+  [data-skin="blueprint"] .install, [data-skin="blueprint"] .verbrack pre { border-radius: 0; }
+  [data-skin="blueprint"] .unit { box-shadow: none; }
+  [data-skin="blueprint"] .pwr { background: var(--rail); border-color: var(--dim); box-shadow: none; }
+  [data-skin="blueprint"] .pwr::after { background: #2a5588; }
+  [data-skin="blueprint"] .u-run .pwr::after { background: #fff; box-shadow: 0 0 9px #fff; }
+  [data-skin="blueprint"] .lcd { background: var(--well); border-color: var(--edge);
+    color: var(--amber); text-shadow: 0 0 5px rgba(255,122,92,.5); }
+  [data-skin="blueprint"] .install { border: 1.5px solid var(--text); }
+  [data-skin="blueprint"] .install button { background: var(--text); color: #113760; }
+  [data-skin="blueprint"] .install button:hover { background: #fff; }
+  [data-skin="blueprint"] .cast { background: none; border: 1.5px solid var(--text);
+    border-radius: 0; box-shadow: none; }
+  [data-skin="blueprint"] .cast::before { display: none; }
+  [data-skin="blueprint"] .cast.waffle { background-image:
+      repeating-linear-gradient(0deg, rgba(220,233,245,.18) 0 2px, transparent 2px 26px),
+      repeating-linear-gradient(90deg, rgba(220,233,245,.18) 0 2px, transparent 2px 26px); }
+  [data-skin="blueprint"] .cast h3 { color: var(--text); text-shadow: none; }
+  [data-skin="blueprint"] .cast p { color: var(--dim); }
+  [data-skin="blueprint"] .cast .stamp { color: var(--amber); }
   * { box-sizing: border-box; margin: 0; }
   html { scroll-behavior: smooth; }
   body { font: 14px/1.6 var(--mono); background: var(--ink); color: var(--text); }
@@ -167,6 +252,16 @@
   .cabcap { text-align: center; color: var(--faint); font-size: 10.5px; margin-top: 14px; letter-spacing: .08em; }
   .cabcap a { color: var(--dim); }
 
+  /* the pour skin's hero: a structural section drawing instead of the cabinet */
+  .sheetlet { display: none; background: var(--u1); border: 1.5px solid var(--edge); border-radius: 4px;
+    box-shadow: inset 0 2px 0 #fff, 0 10px 28px rgba(0,0,0,.12); padding: 18px 18px 10px; }
+  .sheetlet svg { display: block; width: 100%; height: auto; }
+  .sheetlet .caption { display: flex; justify-content: space-between; align-items: baseline;
+    font-family: 'American Typewriter', 'Courier New', monospace; font-size: 11px; color: var(--faint);
+    padding: 10px 4px 6px; border-top: 1px solid var(--line); margin-top: 12px; letter-spacing: .06em; }
+  .sheetlet .caption b { color: var(--text); font-weight: 600; }
+  .sheetlet .led { animation: breathe 2.8s ease-in-out infinite; }
+
   /* ── sections ── */
   section { padding: clamp(48px, 8vw, 84px) 0 0; }
   .sect-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 26px; }
@@ -251,7 +346,7 @@
 
   @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .hero h1 { font-size: clamp(72px, 17vw, 110px); } }
   @media (prefers-reduced-motion: reduce) {
-    .pwr::after, .cabmark::after { animation: none !important; }
+    .pwr::after, .cabmark::after, .sheetlet .led { animation: none !important; }
   }
   a:focus-visible, button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 </style>
@@ -276,9 +371,11 @@
   </span>
   <span class="skins" role="group" aria-label="page skin — the dashboard is skinnable the same way">
     <span class="lbl">skin</span>
+    <button data-s="pour" onclick="setSkin('pour')">pour</button>
     <button data-s="stereo" onclick="setSkin('stereo')">stereo</button>
     <button data-s="hyperscaler" onclick="setSkin('hyperscaler')">hyperscaler</button>
     <button data-s="phosphor" onclick="setSkin('phosphor')">phosphor</button>
+    <button data-s="blueprint" onclick="setSkin('blueprint')">blueprint</button>
     <button data-s="daylight" onclick="setSkin('daylight')">daylight</button>
   </span>
 </nav>
@@ -339,6 +436,90 @@
     <p class="cabcap">this is the dashboard's actual language — every app a rack unit,
     flip one open for its board · <a href="https://github.com/runslab/slab/blob/master/docs/skins.md">skinnable</a>
     — this page too, try the switcher ↑</p>
+
+    <div class="sheetlet" role="img" aria-label="structural section drawing of a waffle slab: three apps bear on top, trunks run concealed in the voids, the span reads laptop to mac mini to VPS">
+      <svg viewBox="0 0 640 400" fill="none">
+        <defs>
+          <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="8" stroke="#b9b6ad" stroke-width="1.4"/>
+          </pattern>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#3d6b8e"/>
+          </marker>
+        </defs>
+        <g font-family="ui-monospace, Menlo, monospace" font-size="11">
+          <rect x="88" y="96" width="92" height="34" rx="3" fill="#f5f4f0" stroke="#26251f" stroke-width="1.5"/>
+          <circle cx="104" cy="113" r="4" fill="#2e9e5b" class="led"/>
+          <text x="116" y="117" fill="#26251f" font-weight="600">web</text>
+          <rect x="266" y="96" width="92" height="34" rx="3" fill="#f5f4f0" stroke="#26251f" stroke-width="1.5"/>
+          <circle cx="282" cy="113" r="4" fill="#2e9e5b" class="led"/>
+          <text x="294" y="117" fill="#26251f" font-weight="600">api</text>
+          <rect x="444" y="96" width="102" height="34" rx="3" fill="#f5f4f0" stroke="#26251f" stroke-width="1.5"/>
+          <circle cx="460" cy="113" r="4" fill="#e08a00" class="led"/>
+          <text x="472" y="117" fill="#26251f" font-weight="600">pg · priv</text>
+        </g>
+        <g stroke="#3d6b8e" stroke-width="1.5">
+          <line x1="16" y1="113" x2="80" y2="113" marker-end="url(#arr)"/>
+        </g>
+        <text x="14" y="100" font-family="'American Typewriter', monospace" font-size="10.5" fill="#3d6b8e">INGRESS :8080</text>
+        <rect x="40" y="132" width="560" height="40" fill="url(#hatch)" stroke="#26251f" stroke-width="2"/>
+        <g>
+          <rect x="40"  y="172" width="42" height="52" fill="url(#hatch)" stroke="#26251f" stroke-width="2"/>
+          <rect x="172" y="172" width="42" height="52" fill="url(#hatch)" stroke="#26251f" stroke-width="2"/>
+          <rect x="304" y="172" width="42" height="52" fill="url(#hatch)" stroke="#26251f" stroke-width="2"/>
+          <rect x="436" y="172" width="42" height="52" fill="url(#hatch)" stroke="#26251f" stroke-width="2"/>
+          <rect x="558" y="172" width="42" height="52" fill="url(#hatch)" stroke="#26251f" stroke-width="2"/>
+        </g>
+        <g>
+          <line x1="82"  y1="198" x2="172" y2="198" stroke="#e4570f" stroke-width="3"/>
+          <line x1="214" y1="198" x2="304" y2="198" stroke="#e4570f" stroke-width="3"/>
+          <line x1="346" y1="198" x2="436" y2="198" stroke="#e4570f" stroke-width="3"/>
+          <line x1="478" y1="198" x2="558" y2="198" stroke="#e4570f" stroke-width="3"/>
+          <line x1="172" y1="198" x2="214" y2="198" stroke="#e4570f" stroke-width="3" stroke-dasharray="3 4" opacity=".55"/>
+          <line x1="304" y1="198" x2="346" y2="198" stroke="#e4570f" stroke-width="3" stroke-dasharray="3 4" opacity=".55"/>
+          <line x1="436" y1="198" x2="478" y2="198" stroke="#e4570f" stroke-width="3" stroke-dasharray="3 4" opacity=".55"/>
+          <circle cx="127" cy="198" r="5" fill="#e4570f"/>
+          <circle cx="391" cy="198" r="5" fill="#e4570f"/>
+        </g>
+        <g stroke="#3d6b8e" stroke-width="1.2" fill="none">
+          <path d="M 391 205 L 391 258 L 420 258"/>
+        </g>
+        <text x="426" y="254" font-family="'American Typewriter', monospace" font-size="10.5" fill="#3d6b8e">TRUNKS — CONCEALED IN THE VOIDS,</text>
+        <text x="426" y="268" font-family="'American Typewriter', monospace" font-size="10.5" fill="#3d6b8e">WIRED HOSTNAMES CROSS MACHINES</text>
+        <g stroke="#3d6b8e" stroke-width="1.2" fill="none">
+          <path d="M 495 92 L 495 62 L 520 62"/>
+        </g>
+        <text x="526" y="58" font-family="'American Typewriter', monospace" font-size="10.5" fill="#3d6b8e">NO HOST</text>
+        <text x="526" y="72" font-family="'American Typewriter', monospace" font-size="10.5" fill="#3d6b8e">PORT. EVER.</text>
+        <g stroke="#3d6b8e" stroke-width="1.2" fill="none">
+          <path d="M 230 152 L 230 60 L 200 60"/>
+        </g>
+        <text x="196" y="56" font-family="'American Typewriter', monospace" font-size="10.5" fill="#3d6b8e" text-anchor="end">ONE DAEMON —</text>
+        <text x="196" y="70" font-family="'American Typewriter', monospace" font-size="10.5" fill="#3d6b8e" text-anchor="end">THE SLAB CARRIES EVERYTHING</text>
+        <g stroke="#3d6b8e" stroke-width="1.2">
+          <line x1="40" y1="236" x2="40" y2="316"/>
+          <line x1="220" y1="236" x2="220" y2="316"/>
+          <line x1="420" y1="236" x2="420" y2="316"/>
+          <line x1="600" y1="236" x2="600" y2="316"/>
+          <line x1="40" y1="306" x2="220" y2="306" marker-start="url(#arr)" marker-end="url(#arr)"/>
+          <line x1="220" y1="306" x2="420" y2="306" marker-start="url(#arr)" marker-end="url(#arr)"/>
+          <line x1="420" y1="306" x2="600" y2="306" marker-start="url(#arr)" marker-end="url(#arr)"/>
+        </g>
+        <g font-family="'American Typewriter', monospace" font-size="10.5" fill="#26251f" text-anchor="middle">
+          <text x="130" y="298">YOUR LAPTOP</text>
+          <text x="320" y="298">MAC MINI, CLOSET</text>
+          <text x="510" y="298">$5 VPS</text>
+        </g>
+        <text x="320" y="344" font-family="'American Typewriter', monospace" font-size="11" fill="#6e6b62" text-anchor="middle" letter-spacing="2">CLEAR SPAN — ONE SYSTEM, BYTE-IDENTICAL URLS</text>
+        <g transform="translate(48, 372)">
+          <circle cx="12" cy="0" r="13" fill="none" stroke="#26251f" stroke-width="1.5"/>
+          <line x1="-1" y1="0" x2="25" y2="0" stroke="#26251f" stroke-width="1.5"/>
+          <text x="12" y="-3" font-family="'American Typewriter', monospace" font-size="10" fill="#26251f" text-anchor="middle">A</text>
+          <text x="12" y="9" font-family="'American Typewriter', monospace" font-size="7" fill="#26251f" text-anchor="middle">S-1</text>
+        </g>
+      </svg>
+      <div class="caption"><span><b>SECTION A–A</b> · WAFFLE SLAB, TYP.</span><span>SCALE: LOCALHOST · <a href="https://github.com/runslab/slab/blob/master/docs/skins.md">skinnable</a> — try the switcher ↑</span></div>
+    </div>
   </div>
 </header>
 
@@ -454,7 +635,7 @@ function setSkin(name) {
   markSkin()
 }
 function markSkin() {
-  const cur = document.documentElement.dataset.skin || 'stereo'
+  const cur = document.documentElement.dataset.skin || 'pour'
   document.querySelectorAll('.skins button').forEach(b => b.classList.toggle('on', b.dataset.s === cur))
 }
 markSkin()
