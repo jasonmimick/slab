@@ -1,0 +1,19 @@
+# Primary: accepts writes, streams WAL to the replica. The pgdata volume is
+# why this cluster survives redeploys — see docs/manifest.md#volumes.
+name = "pg-primary"
+type = "service"
+port = 5432
+public = false
+image = "bitnamilegacy/postgresql:17"
+volumes = ["pgdata:/bitnami/postgresql"]
+
+# Demo credentials, inline on purpose: every member is public=false, reachable
+# only from system-mates on this rack. Use `secrets` for anything real.
+[env]
+POSTGRESQL_REPLICATION_MODE = "master"
+POSTGRESQL_REPLICATION_USER = "repl"
+POSTGRESQL_REPLICATION_PASSWORD = "replpass"
+POSTGRESQL_USERNAME = "app"
+POSTGRESQL_PASSWORD = "apppass"
+POSTGRESQL_DATABASE = "appdb"
+POSTGRESQL_POSTGRES_PASSWORD = "postgrespass"

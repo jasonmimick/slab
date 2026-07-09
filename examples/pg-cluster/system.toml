@@ -1,0 +1,19 @@
+# pg-cluster: a compose-grade postgres cluster — primary + streaming replica
+# behind pgbouncer, all private. Deploy: slab up examples/pg-cluster
+#
+# Apps consume it by wiring DATABASE_URL at pgbouncer:6432. No auto-failover —
+# promoting the replica is a future agent verb, not magic.
+name = "pg-cluster"
+
+[apps.pg-primary]
+source = "./pg-primary"
+
+[apps.pg-replica]
+source = "./pg-replica"
+
+[apps.pgbouncer]
+source = "./pgbouncer"
+
+[wires]
+"pg-replica.POSTGRESQL_MASTER_HOST" = "pg-primary"
+"pgbouncer.POSTGRESQL_HOST" = "pg-primary"

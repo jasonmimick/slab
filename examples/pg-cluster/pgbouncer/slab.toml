@@ -1,0 +1,14 @@
+# Connection pooler: the single address apps talk to. Wire your app's
+# DATABASE_URL to postgresql://app:apppass@pgbouncer:6432/appdb
+name = "pgbouncer"
+type = "service"
+port = 6432
+public = false
+image = "bitnamilegacy/pgbouncer:latest"
+
+[env]
+POSTGRESQL_USERNAME = "app"
+POSTGRESQL_PASSWORD = "apppass"
+POSTGRESQL_DATABASE = "appdb"
+PGBOUNCER_DATABASE = "appdb"
+PGBOUNCER_PORT = "6432"
