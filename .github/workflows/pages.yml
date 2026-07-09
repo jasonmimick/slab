@@ -1,10 +1,12 @@
-# Deploys site/ to GitHub Pages (jasonmimick.github.io/slab).
-# The site is a single self-contained index.html — no build step.
+# Deploys site/ to GitHub Pages (runslab.run).
+# The site is a single self-contained index.html — no build step. The repo's
+# install.sh is staged into the artifact as /install so
+# `curl -fsSL https://runslab.run/install | bash` serves the real thing.
 name: pages
 on:
   push:
     branches: [master]
-    paths: ['site/**', '.github/workflows/pages.yml']
+    paths: ['site/**', 'install.sh', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -25,8 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: stage site + /install
+        run: |
+          mkdir -p _site
+          cp -R site/. _site/
+          cp install.sh _site/install
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

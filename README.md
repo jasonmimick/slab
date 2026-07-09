@@ -36,7 +36,7 @@ dashboard, or AI agents speaking MCP.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/runslab/slab/master/install.sh | bash
+curl -fsSL https://runslab.run/install | bash
 ```
 
 The installer checks your prerequisites (and tells you exactly how to fix

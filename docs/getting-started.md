@@ -3,8 +3,11 @@
 ## install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/runslab/slab/master/install.sh | bash
+curl -fsSL https://runslab.run/install | bash
 ```
+
+(or the same script straight from the repo:
+`curl -fsSL https://raw.githubusercontent.com/runslab/slab/master/install.sh | bash`)
 
 The installer checks prerequisites (Docker with the engine running,
 Node ≥ 20, git; `cloudflared` optional — only `slab expose` uses it), clones

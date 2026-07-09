@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # slab installer — the localhost hyperscaler
 #
-#   curl -fsSL https://raw.githubusercontent.com/runslab/slab/master/install.sh | bash
+#   curl -fsSL https://runslab.run/install | bash
 #
 # What it does: checks prerequisites (git, node >= 20, docker), clones slab
 # to ~/.slab/src (or pulls if already there), builds it, puts `slab` on your
