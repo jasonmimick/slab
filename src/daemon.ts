@@ -322,6 +322,7 @@ async function main(): Promise<void> {
       const containerId = await engine.runContainer(record, imageTag, env, {
         publish: record.manifest.public !== false,
         networks,
+        volumes: record.manifest.volumes,
       })
       record.containerId = containerId
       record.imageTag = imageTag

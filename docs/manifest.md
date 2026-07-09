@@ -120,6 +120,32 @@ Postgres there, you'll need to add the host gateway yourself (e.g. an
 `extra_hosts: host.docker.internal:host-gateway` equivalent), since slab
 does not currently add that mapping for you.
 
+## `volumes` (optional, default `[]`)
+
+```toml
+volumes = ["pgdata:/var/lib/postgresql/data"]
+```
+
+Named volumes, `"name:/container/path"`. Without volumes an app loses
+**all** written data on every deploy — slab removes and recreates the
+container, and the writable layer goes with it. Anything a stateful member
+writes under a volume path survives redeploys, restarts, and sleep/wake.
+
+Rules and behavior:
+
+- **Named volumes only** — the name must match `[a-zA-Z0-9][a-zA-Z0-9_.-]*`
+  and the container path must be absolute. Host-path bind mounts are
+  deliberately not supported.
+- The actual docker volume is namespaced **`slab-<app>-<name>`**
+  (`pgdata` on app `pg-primary` → `slab-pg-primary-pgdata`), so two apps
+  can both declare `pgdata` without colliding. Docker creates the volume
+  on first use.
+- **`slab remove` keeps volumes** — data-safe by default. Purge manually
+  with `docker volume rm slab-<app>-<name>`.
+- Volumes live on the node where the container runs. A member placed on a
+  different node (trunks) starts with an empty volume there — slab does
+  not migrate data between nodes.
+
 ## `secrets` (optional, default `[]`)
 
 ```toml

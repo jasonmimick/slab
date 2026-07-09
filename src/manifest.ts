@@ -35,11 +35,25 @@ export function loadManifest(sourceDir: string): Manifest {
     image,
     postgres: raw.postgres === true,
     secrets: Array.isArray(raw.secrets) ? raw.secrets.map(String) : [],
+    volumes: Array.isArray(raw.volumes) ? raw.volumes.map(v => parseVolume(String(v))) : [],
     idle_timeout: raw.idle_timeout != null ? String(raw.idle_timeout) : '5m',
     env: typeof raw.env === 'object' && raw.env !== null
       ? Object.fromEntries(Object.entries(raw.env as Record<string, unknown>).map(([k, v]) => [k, String(v)]))
       : {},
   }
+}
+
+// "pgdata:/var/lib/postgresql/data" — named volumes only, no host-path binds
+const VOLUME_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/
+
+function parseVolume(entry: string): string {
+  const i = entry.indexOf(':')
+  const name = i === -1 ? '' : entry.slice(0, i)
+  const target = i === -1 ? '' : entry.slice(i + 1)
+  if (!VOLUME_NAME_RE.test(name) || !target.startsWith('/')) {
+    throw new Error(`Invalid volume "${entry}" — expected "name:/container/path" (named volumes only, no host paths)`)
+  }
+  return entry
 }
 
 function sanitizeName(raw: string): string {

@@ -180,7 +180,7 @@ export function createEngine(): Engine {
     app: AppRecord,
     imageTag: string,
     env: Record<string, string>,
-    opts?: { publish?: boolean; networks?: string[] },
+    opts?: { publish?: boolean; networks?: string[]; volumes?: string[] },
   ): Promise<string> {
     const publish = opts?.publish ?? true
 
@@ -204,6 +204,11 @@ export function createEngine(): Engine {
             ? { [portKey]: [{ HostIp: '127.0.0.1', HostPort: String(app.hostPort) }] }
             : undefined,
           RestartPolicy: { Name: app.manifest.type === 'service' ? 'unless-stopped' : 'no' },
+          // Named volumes survive the remove/recreate on every deploy. Namespaced
+          // per app; docker auto-creates on first use, `slab remove` keeps them.
+          Binds: opts?.volumes?.length
+            ? opts.volumes.map((v) => `slab-${app.name}-${v}`)
+            : undefined,
         },
       })
     } catch (err) {

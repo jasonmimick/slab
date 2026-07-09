@@ -16,6 +16,8 @@ export interface Manifest {
                             // Omit to build from the Dockerfile in the source dir.
   postgres?: boolean        // true -> slab provisions a DB and injects DATABASE_URL
   secrets?: string[]        // env var names the app expects (values set via `slab secret set`)
+  volumes?: string[]        // named volumes, "name:/container/path" — data survives redeploys.
+                            // Actual docker volume is namespaced slab-<app>-<name>; kept on remove.
   idle_timeout?: string     // functions only, e.g. "5m" (default "5m")
   env?: Record<string, string>  // static, non-secret env vars
 }
@@ -158,7 +160,7 @@ export interface Engine {
   // opts.publish=false -> NO port binding (private member, network-only).
   // opts.networks: slab system networks to join (alias = app name), joined
   // after start. Stops/removes any previous container first. Returns id.
-  runContainer(app: AppRecord, imageTag: string, env: Record<string, string>, opts?: { publish?: boolean; networks?: string[] }): Promise<string>
+  runContainer(app: AppRecord, imageTag: string, env: Record<string, string>, opts?: { publish?: boolean; networks?: string[]; volumes?: string[] }): Promise<string>
   stopContainer(app: AppRecord): Promise<void>       // stop, keep container (functions sleep this way)
   startContainer(app: AppRecord): Promise<void>      // docker start existing container
   removeContainer(app: AppRecord): Promise<void>     // stop + rm
