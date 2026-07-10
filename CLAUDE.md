@@ -91,8 +91,11 @@ node = "some-peer"        # optional: run this member on a peer (the waffle move
   "Slab types"): **flat** (no wires), **one-way** (directed/acyclic),
   **two-way** (mutual/cyclic), **waffle** (spans nodes). Product framing:
   three nouns (apps/jobs/systems), three verbs (deploy/run/up), one verb
-  per noun; wires = edges, `node =` = placement, graph theory kept to
-  footnote register in copy.
+  per noun. **System = (Apps, Wires) as G = (V, E)** — placement (`node =`)
+  is deliberately NOT part of the definition, it's a separate layer (same
+  system, different embedding; waffle = placement property, flat/one-way/
+  two-way = graph properties). Graph theory stays in footnote register.
+  Vocabulary rule: apps are vertices, machines are nodes — never mix.
 
 ### Jobs
 `slab run <src> -- cmd` runs a container to completion (`slab jobs`,

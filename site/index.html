@@ -560,8 +560,8 @@
     </div>
     <div class="cabmark">slab<span class="chinfo">one manifest · toml · git-trackable</span></div>
   </div>
-  <p class="pour-note">wires are the edges, <code>node =</code> is the placement: that's the
-  whole grammar. everything else is composition.</p>
+  <p class="pour-note">a system is (apps, wires) the way a graph is (V, E): that's the whole
+  definition. where it runs is a separate question, one optional line per member.</p>
 </section>
 
 <section>
@@ -574,9 +574,10 @@
   </div>
   <p class="pour-note">the dashboard stamps every system's nameplate with its type, computed
   from the wire graph, not declared. <code>examples/</code> ships one of each.
-  <span class="ftnote">in graph terms: apps are vertices, wires are edges, <code>node =</code>
-  is the placement function. flat = no edges · one-way = acyclic · two-way = cyclic ·
-  waffle = the graph cut across machines. any shape you can draw fits in a page of toml.</span></p>
+  <span class="ftnote">in graph terms: System = (Apps, Wires) as G = (V, E). flat = no edges ·
+  one-way = acyclic · two-way = cyclic. placement is a separate layer: put
+  <code>node = "garage"</code> on a member and the same graph spans machines · that's the
+  waffle. any graph you can draw fits in a page of toml.</span></p>
 </section>
 
 <section>

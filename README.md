@@ -68,8 +68,9 @@ postgres, secrets, private members); see [docs/manifest.md](docs/manifest.md).
 
 ## The elements
 
-Three nouns, three verbs, one verb per noun. Wires are the edges, `node =`
-is the placement; everything else is composition.
+Three nouns, three verbs, one verb per noun. A system is (apps, wires) the
+way a graph is (V, E); where it runs is a separate question (`node =`, one
+optional line per member).
 
 | verb | what it runs | example |
 |---|---|---|
