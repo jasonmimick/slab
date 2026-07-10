@@ -84,6 +84,16 @@ its own bridge and the aliases stay unambiguous. Single-node systems keep
 plain names. Peer trunk addresses of `127.0.0.1` are rewritten to
 `host.docker.internal` inside trunk containers.
 
+## two implementations, one protocol
+
+Both daemons — the TypeScript reference (`src/trunk.ts`) and the Go rewrite
+(`go/internal/engine/trunk.go`) — generate the *same* dependency-free trunk
+program and run it in a stock `node:22-alpine` container, so their trunks
+interoperate by construction. The preamble (`<token> <member>\n`) and the
+TrunkConfig JSON are the protocol; `scripts/conformance.js` proves a
+spanning system works on each implementation. Port protocol changes to
+`src/trunk.ts` first; the Go side copies it verbatim.
+
 ## v1 limits, honestly
 
 - **Distinct ports.** Members of a spanning system must listen on distinct

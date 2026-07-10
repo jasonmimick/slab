@@ -128,6 +128,9 @@ async function main(): Promise<void> {
   state.systems ??= {}
   state.jobs ??= {}
   state.peers ??= {}
+  // SLAB_NODE_NAME wins (multi-daemon hosts need distinct identities without
+  // hand-editing state); else keep the persisted name; else the hostname.
+  if (process.env.SLAB_NODE_NAME) state.nodeName = sanitizeJobName(process.env.SLAB_NODE_NAME)
   state.nodeName ??= sanitizeJobName(os.hostname().replace(/\.(local|lan|home)$/i, ''))
   const systems = state.systems // non-optional local alias, safe to use inside closures/handlers
   const jobs = state.jobs

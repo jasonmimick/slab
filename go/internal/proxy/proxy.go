@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -67,17 +66,20 @@ func (p *Proxy) Handler() http.Handler {
 	})
 }
 
-// wake starts the container and polls the host port until it answers.
+// wake starts the container and polls until the app answers HTTP. A bare
+// TCP connect is not enough: docker-proxy accepts on the host port the
+// moment the container starts, before the app inside is listening.
 func (p *Proxy) wake(ctx context.Context, rec *state.AppRecord) error {
 	if err := p.Eng.Start(ctx, rec.Name); err != nil {
 		return err
 	}
 	deadline := time.Now().Add(wakeTimeout)
-	addr := fmt.Sprintf("127.0.0.1:%d", *rec.HostPort)
+	probe := &http.Client{Timeout: time.Second}
+	url := fmt.Sprintf("http://127.0.0.1:%d/", *rec.HostPort)
 	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", addr, time.Second)
-		if err == nil {
-			conn.Close()
+		resp, err := probe.Get(url)
+		if err == nil { // any HTTP status counts as awake
+			resp.Body.Close()
 			p.St.Records.Lock()
 			rec.State = state.Running
 			p.St.Records.Unlock()

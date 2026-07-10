@@ -227,7 +227,7 @@ func (s *Server) executeJob(job *state.JobRecord) {
 	networks := make([]string, 0, len(job.Systems))
 	for _, sysName := range job.Systems {
 		if sys := s.St.Systems[sysName]; sys != nil {
-			networks = append(networks, systemNet(sys))
+			networks = append(networks, s.systemNet(sys))
 		}
 	}
 	s.St.Records.RUnlock()

@@ -23,6 +23,7 @@ type Server struct {
 	NodeName  string
 	Token     string
 	ProxyPort int
+	Advertise string // what other nodes dial for trunks (SLAB_ADVERTISE)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -189,14 +190,15 @@ func (s *Server) Handler() http.Handler {
 		}
 		baseDir := filepath.Dir(body.SourceFile)
 		members := make([]string, 0, len(sm.Members))
+		memberNodes := map[string]string{}
 		for name, m := range sm.Members {
-			if m.Node != "" {
-				errJSON(w, 501, fmt.Sprintf("member %q has node placement — trunks are a later rung of slabd", name))
-				return
+			members = append(members, name)
+			if m.Node != "" && m.Node != s.NodeName {
+				memberNodes[name] = m.Node
+				continue // placed members are created by the peer at adopt time
 			}
 			if _, exists := s.St.Apps[name]; exists {
-				members = append(members, name) // adopt the existing app
-				continue
+				continue // adopt the existing app
 			}
 			src := m.Source
 			if !filepath.IsAbs(src) {
@@ -212,9 +214,11 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 			s.St.Apps[name] = &state.AppRecord{Name: name, SourceDir: src, Manifest: mf, State: state.Created}
-			members = append(members, name)
 		}
-		rec := &state.SystemRecord{Name: sm.Name, Members: members, Wires: sm.Wires, SourceFile: body.SourceFile}
+		rec := &state.SystemRecord{
+			Name: sm.Name, Members: members, MemberNodes: memberNodes,
+			Wires: sm.Wires, SourceFile: body.SourceFile, CreatedAt: iso(time.Now()),
+		}
 		s.St.Systems[sm.Name] = rec
 		_ = s.St.Save()
 		writeJSON(w, 201, map[string]any{"system": rec})
@@ -226,20 +230,9 @@ func (s *Server) Handler() http.Handler {
 			errJSON(w, 404, "unknown system")
 			return
 		}
-		if err := s.Eng.EnsureNetwork(r.Context(), systemNet(sys)); err != nil {
-			errJSON(w, 500, err.Error())
+		if status, err := s.deploySystem(r.Context(), sys); err != nil {
+			errJSON(w, status, err.Error())
 			return
-		}
-		for _, m := range sys.Members {
-			rec := s.St.Apps[m]
-			if rec == nil {
-				errJSON(w, 500, fmt.Sprintf("system %q member %q is not a known app", sys.Name, m))
-				return
-			}
-			if err := s.deployApp(r.Context(), rec); err != nil {
-				errJSON(w, 500, fmt.Sprintf("failed to deploy member %q of system %q: %s", m, sys.Name, err.Error()))
-				return
-			}
 		}
 		writeJSON(w, 200, map[string]any{"system": sys})
 	})
@@ -250,7 +243,8 @@ func (s *Server) Handler() http.Handler {
 			errJSON(w, 404, "unknown system")
 			return
 		}
-		s.Eng.RemoveNetwork(r.Context(), systemNet(sys)) // apps are kept
+		s.Eng.RemoveTrunk(r.Context(), s.trunkKey(sys))
+		s.Eng.RemoveNetwork(r.Context(), s.systemNet(sys)) // apps are kept
 		delete(s.St.Systems, sys.Name)
 		_ = s.St.Save()
 		writeJSON(w, 200, map[string]any{"detached": sys.Name})
@@ -294,12 +288,22 @@ func (s *Server) Handler() http.Handler {
 	})
 
 	s.jobRoutes(mux)
+	s.spanningRoutes(mux)
 	s.clusterRoutes(mux)
 
 	return mux
 }
 
-func systemNet(sys *state.SystemRecord) string { return "slab-net-" + sys.Name }
+// systemNet is node-scoped for spanning systems: two daemons on one docker
+// host each keep their own bridge and the aliases stay unambiguous.
+func (s *Server) systemNet(sys *state.SystemRecord) string {
+	if sys.SpansNodes() {
+		return "slab-net-" + s.NodeName + "-" + sys.Name
+	}
+	return "slab-net-" + sys.Name
+}
+
+func (s *Server) trunkKey(sys *state.SystemRecord) string { return s.NodeName + "-" + sys.Name }
 
 // deployApp is the rung-1 deploy: re-read manifest, resolve the image
 // (prebuilt only for now — Dockerfile builds are the next rung), assemble
@@ -350,10 +354,10 @@ func (s *Server) deployApp(ctx context.Context, rec *state.AppRecord) error {
 	}
 	networks := make([]string, 0, len(memberSystems))
 	for _, sys := range memberSystems {
-		if err := s.Eng.EnsureNetwork(ctx, systemNet(sys)); err != nil {
+		if err := s.Eng.EnsureNetwork(ctx, s.systemNet(sys)); err != nil {
 			return err
 		}
-		networks = append(networks, systemNet(sys))
+		networks = append(networks, s.systemNet(sys))
 	}
 
 	// merge order: PORT < manifest.env < wires < secrets < DATABASE_URL

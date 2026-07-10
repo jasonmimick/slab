@@ -54,11 +54,26 @@ type PeerRecord struct {
 
 // SystemRecord mirrors the TS SystemRecord (field names are the contract).
 type SystemRecord struct {
-	Name        string            `json:"name"`
-	Members     []string          `json:"members"`
-	MemberNodes map[string]string `json:"memberNodes,omitempty"`
-	Wires       map[string]string `json:"wires"`
-	SourceFile  string            `json:"sourceFile"`
+	Name          string            `json:"name"`
+	Members       []string          `json:"members"`
+	MemberNodes   map[string]string `json:"memberNodes,omitempty"`
+	Wires         map[string]string `json:"wires"`
+	SourceFile    string            `json:"sourceFile"`
+	Origin        *string           `json:"origin,omitempty"`        // set on adopted systems
+	TrunkHostPort *int              `json:"trunkHostPort,omitempty"` // this node's trunk ingress
+	TrunkToken    *string           `json:"trunkToken,omitempty"`
+	CreatedAt     string            `json:"createdAt,omitempty"`
+	DeployedAt    *string           `json:"deployedAt,omitempty"`
+}
+
+// SpansNodes reports whether any member is placed on another node.
+func (sys *SystemRecord) SpansNodes() bool {
+	for _, n := range sys.MemberNodes {
+		if n != "" {
+			return true
+		}
+	}
+	return false
 }
 
 type JobState string
@@ -238,15 +253,21 @@ func EnsureNode() (*NodeConfig, error) {
 	if err == nil {
 		var n NodeConfig
 		if err := json.Unmarshal(data, &n); err == nil {
+			if env := os.Getenv("SLAB_NODE_NAME"); env != "" {
+				n.Name = env // env wins, same as the TS daemon
+			}
 			return &n, nil
 		}
 	}
-	host, _ := os.Hostname()
+	name := os.Getenv("SLAB_NODE_NAME")
+	if name == "" {
+		name, _ = os.Hostname()
+	}
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
 		return nil, err
 	}
-	n := &NodeConfig{Name: host, Token: hex.EncodeToString(buf)}
+	n := &NodeConfig{Name: name, Token: hex.EncodeToString(buf)}
 	out, _ := json.MarshalIndent(n, "", "  ")
 	if err := os.WriteFile(file, out, 0o600); err != nil {
 		return nil, err

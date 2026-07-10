@@ -84,6 +84,7 @@ async function main() {
       SLAB_PG_PORT: String(PORT + 700),   // namespaced shared-postgres (no collision with a live rack)
       SLAB_PORT_BASE: String(PORT + 3000), // own host-port range (ditto)
       SLAB_IDLE_REAP_MS: '2000',          // fast reaper so the sleep/wake spec is testable
+      SLAB_NODE_NAME: 'conf-a',           // distinct node identities (spanning-system networks)
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -292,6 +293,7 @@ source = "./${apiApp}"
       env: {
         ...process.env, SLAB_DIR: dir2, SLAB_PORT: String(PORT + 1), SLAB_PROXY_PORT: String(PROXY + 1),
         SLAB_PG_PORT: String(PORT + 701), SLAB_PORT_BASE: String(PORT + 4000), SLAB_IDLE_REAP_MS: '2000',
+        SLAB_NODE_NAME: 'conf-peer',
       },
       stdio: ['ignore', 'ignore', 'ignore'],
     })
@@ -311,6 +313,52 @@ source = "./${apiApp}"
         'fleet shows both nodes, peer reachable', JSON.stringify(nodes.map((x) => ({ name: x.name, reachable: x.reachable }))))
       const noAuth = await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps`, { headers: { 'x-forwarded-for': 'external' } })
       ok(noAuth.status === 200, 'loopback exempt from auth (sanity)', String(noAuth.status))
+
+      // ── trunks: a system spanning both daemons, byte-identical urls ──────
+      const spanWeb = `conf-sweb-${RUN}`
+      const spanApi = `conf-sapi-${RUN}`
+      const swDir = path.join(dir, 'fixtures', spanWeb)
+      const saDir = path.join(dir, 'fixtures', spanApi)
+      fs.mkdirSync(swDir, { recursive: true }); fs.mkdirSync(saDir, { recursive: true })
+      fs.writeFileSync(path.join(swDir, 'slab.toml'), `name = "${spanWeb}"\ntype = "service"\nport = 80\nimage = "nginx:alpine"\n`)
+      fs.writeFileSync(path.join(saDir, 'slab.toml'), `name = "${spanApi}"\ntype = "service"\nport = 81\npublic = false\nimage = "nginx:alpine"\n\n[env]\nNGINX_ENTRYPOINT_QUIET_LOGS = "1"\n`)
+      // the private member listens on 81 (distinct ports rule): tiny conf override
+      fs.writeFileSync(path.join(saDir, 'listen.conf'), 'server { listen 81; location / { return 200 "span-ok"; } }\n')
+      fs.writeFileSync(path.join(saDir, 'Dockerfile'), 'FROM nginx:alpine\nCOPY listen.conf /etc/nginx/conf.d/default.conf\nEXPOSE 81\n')
+      fs.writeFileSync(path.join(saDir, 'slab.toml'), `name = "${spanApi}"\ntype = "service"\nport = 81\npublic = false\n`)
+      const spanSys = `conf-span-${RUN}`
+      const spanFile = path.join(dir, 'fixtures', `${spanSys}.system.toml`)
+      fs.writeFileSync(spanFile,
+`name = "${spanSys}"
+
+[apps.${spanWeb}]
+source = "./${spanWeb}"
+
+[apps.${spanApi}]
+source = "./${spanApi}"
+node = "conf-peer"
+
+[wires]
+"${spanWeb}.SPAN_URL" = "http://${spanApi}:81"
+`)
+      r = await api('POST', '/v1/systems', { sourceFile: spanFile })
+      ok(r.status === 200 || r.status === 201, 'spanning system registers', r.text)
+      r = await api('POST', `/v1/systems/${spanSys}/deploy`)
+      ok(r.status === 200, 'spanning deploy: adopt + trunks + sync', r.text)
+      let span = ''
+      await waitFor(async () => {  // the trunk's listeners come up ~a second after deploy returns
+        try { span = docker('exec', `slab-${spanWeb}`, 'sh', '-c', `wget -qO- -T 3 http://${spanApi}:81`) } catch (e) { span = String(e.message) }
+        return span === 'span-ok'
+      }, 'trunk dial', 15000).catch(() => {})
+      ok(span === 'span-ok', 'cross-node member dial through the trunk (byte-identical url)', span)
+      const trunks = docker('ps', '--format', '{{.Names}}', '--filter', 'name=slab-trunk-')
+      ok(trunks.split('\n').filter((t) => t.includes(spanSys)).length === 2, 'one trunk per node', trunks)
+      await api('DELETE', `/v1/systems/${spanSys}`)
+      await api('DELETE', `/v1/apps/${spanWeb}`)
+      await fetch(`http://127.0.0.1:${PORT + 1}/v1/systems/${spanSys}`, { method: 'DELETE' })
+      await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${spanApi}`, { method: 'DELETE' })
+      try { docker('rm', '-f', `slab-trunk-conf-peer-${spanSys}`) } catch {}
+
       await api('DELETE', '/v1/peers/conf-peer')
     } finally {
       daemon2.kill()
@@ -331,10 +379,16 @@ main()
   .catch((err) => { console.error(`fatal: ${err.message}`); process.exitCode = 1 })
   .finally(() => {
     if (daemon) daemon.kill()
-    // belt & suspenders: remove any containers this run leaked
+    // belt & suspenders: remove any containers and networks this run leaked
+    // (docker has a finite subnet pool — leaked bridges exhaust it)
     try {
       const leftovers = docker('ps', '-aq', '--filter', `name=conf-.*-${RUN}`)
       if (leftovers) execFileSync('docker', ['rm', '-f', ...leftovers.split('\n')])
+    } catch {}
+    try {
+      const nets = docker('network', 'ls', '--format', '{{.Name}}')
+        .split('\n').filter((n) => n.includes('conf-') && n.includes(RUN))
+      for (const n of nets) { try { docker('network', 'rm', n) } catch {} }
     } catch {}
     fs.rmSync(dir, { recursive: true, force: true })
   })

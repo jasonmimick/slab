@@ -55,7 +55,11 @@ func main() {
 		bind = "127.0.0.1"
 	}
 
-	srv := &api.Server{St: st, Eng: eng, NodeName: node.Name, Token: node.Token, ProxyPort: proxyPort}
+	advertise := os.Getenv("SLAB_ADVERTISE")
+	if advertise == "" {
+		advertise = "127.0.0.1"
+	}
+	srv := &api.Server{St: st, Eng: eng, NodeName: node.Name, Token: node.Token, ProxyPort: proxyPort, Advertise: advertise}
 
 	go idleReaper(st, eng)
 
