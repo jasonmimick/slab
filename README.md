@@ -136,7 +136,7 @@ More detail (full index at [docs/](docs/README.md)):
 
 ## Status
 
-v0. Known sharp edges, honestly stated:
+v0 alpha. Current limits:
 
 - **Single-node.** One daemon, one Docker host, no clustering, no HA.
 - **Secrets are plaintext on disk**, one JSON file per app under
