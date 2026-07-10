@@ -91,11 +91,15 @@ node = "some-peer"        # optional: run this member on a peer (the waffle move
   "Slab types"): **flat** (no wires), **one-way** (directed/acyclic),
   **two-way** (mutual/cyclic), **waffle** (spans nodes). Product framing:
   three nouns (apps/jobs/systems), three verbs (deploy/run/up), one verb
-  per noun. **System = (Apps, Wires) as G = (V, E)** — placement (`node =`)
-  is deliberately NOT part of the definition, it's a separate layer (same
-  system, different embedding; waffle = placement property, flat/one-way/
-  two-way = graph properties). Graph theory stays in footnote register.
-  Vocabulary rule: apps are vertices, machines are nodes — never mix.
+  per noun. Jason's formalization (canonical): **system = ({apps, jobs},
+  wires)** — a graph whose vertices are things that run (jobs are transient
+  vertices; they attach to system networks); **node = the set of systems it
+  carries**; **fleet = the set of nodes**. The ontology builds upward with
+  no extra primitives, and the dashboard mirrors it: rack unit → cabinet →
+  band → fleet view. flat/one-way/two-way = edge-structure properties;
+  waffle = a system in more than one node's set. Graph theory stays in
+  footnote register. Vocabulary: apps/jobs are vertices, machines are
+  nodes — never mix.
 
 ### Jobs
 `slab run <src> -- cmd` runs a container to completion (`slab jobs`,

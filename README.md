@@ -68,9 +68,9 @@ postgres, secrets, private members); see [docs/manifest.md](docs/manifest.md).
 
 ## The elements
 
-Three nouns, three verbs, one verb per noun. A system is (apps, wires) the
-way a graph is (V, E); where it runs is a separate question (`node =`, one
-optional line per member).
+Three nouns, three verbs, one verb per noun. Apps and jobs are the
+vertices, wires are the edges: a system is a graph. A node is the set of
+systems it carries.
 
 | verb | what it runs | example |
 |---|---|---|
