@@ -33,6 +33,10 @@ or AI agents speaking MCP.
       every app a rack unit · flip it open to see the board
 ```
 
+![the slab dashboard: the stereo rack, then one click in settings switches the whole thing to the phosphor CRT skin](assets/slab-demo.gif)
+
+*the real thing: the rack in the stereo skin, then one click → phosphor. ([skins](docs/skins.md))*
+
 ## Install
 
 ```bash
