@@ -186,6 +186,20 @@ source = "./${apiApp}"
   r = await api('GET', '/v1/systems')
   ok(r.status === 200 && JSON.stringify(r.json).includes(sysName), 'GET /v1/systems lists the system')
 
+  // dockerfile build: no slab.toml, manifest inferred, image built locally
+  const buildApp = `conf-build-${RUN}`
+  const buildDir = path.join(dir, 'fixtures', buildApp)
+  fs.mkdirSync(buildDir, { recursive: true })
+  fs.writeFileSync(path.join(buildDir, 'Dockerfile'), 'FROM nginx:alpine\nEXPOSE 80\nRUN echo built-by-slab > /usr/share/nginx/html/index.html\n')
+  r = await api('POST', '/v1/apps', { sourceDir: buildDir })
+  ok(r.status === 201 && r.json?.app?.manifest?.port === 80, 'manifest inferred from Dockerfile EXPOSE', r.text)
+  r = await api('POST', `/v1/apps/${buildApp}/deploy`)
+  ok(r.status === 200 && r.json?.app?.state === 'running', 'dockerfile app builds and runs', r.text)
+  const built = docker('exec', `slab-${buildApp}`, 'cat', '/usr/share/nginx/html/index.html')
+  ok(built === 'built-by-slab', 'the built image is the one running')
+  await api('DELETE', `/v1/apps/${buildApp}`)
+
+  if (RUNG >= 3) {
   // ── jobs: run-to-completion, exit codes, logs ───────────────────────────
   r = await api('POST', '/v1/jobs', { image: 'alpine:3', command: ['sh', '-c', 'echo conf-ok'] })
   ok(r.status === 200 || r.status === 201, 'POST /v1/jobs accepts an image job', r.text)
@@ -206,6 +220,7 @@ source = "./${apiApp}"
   }, 'job failure', 60000)
   const failed = await api('GET', `/v1/jobs/${failId}`)
   ok((failed.json?.job?.exitCode ?? failed.json?.exitCode) === 3, 'exit code propagates', failed.text)
+  }
 
   // ── teardown surface: system rm keeps apps, app rm removes ─────────────
   r = await api('DELETE', `/v1/systems/${sysName}`)

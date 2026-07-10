@@ -4,15 +4,21 @@
 package engine
 
 import (
+	"archive/tar"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 
@@ -67,8 +73,23 @@ func (e *Engine) RemoveExisting(ctx context.Context, app string) error {
 }
 
 type RunOpts struct {
-	Publish bool
-	Volumes []string // manifest form "name:/path"; namespaced here
+	Publish  bool
+	Volumes  []string // manifest form "name:/path"; namespaced here
+	Networks []string // system networks; joined with the app name as alias
+}
+
+// EnsureNetwork creates a bridge network if it doesn't exist.
+func (e *Engine) EnsureNetwork(ctx context.Context, name string) error {
+	if _, err := e.cli.NetworkInspect(ctx, name, network.InspectOptions{}); err == nil {
+		return nil
+	}
+	_, err := e.cli.NetworkCreate(ctx, name, network.CreateOptions{Driver: "bridge"})
+	return err
+}
+
+// RemoveNetwork tears a system network down (ignore-if-absent).
+func (e *Engine) RemoveNetwork(ctx context.Context, name string) {
+	_ = e.cli.NetworkRemove(ctx, name)
 }
 
 // RunContainer removes any prior container and creates + starts a fresh one —
@@ -110,10 +131,81 @@ func (e *Engine) RunContainer(ctx context.Context, app *state.AppRecord, imageTa
 	if err != nil {
 		return "", fmt.Errorf("failed to create container for %s: %w", app.Name, err)
 	}
+	// join system networks BEFORE start — members resolve each other by app
+	// name (network alias), and the app may dial a mate the moment it boots
+	for _, net := range opts.Networks {
+		err := e.cli.NetworkConnect(ctx, net, created.ID, &network.EndpointSettings{Aliases: []string{app.Name}})
+		if err != nil {
+			return "", fmt.Errorf("failed to join %s to network %s: %w", app.Name, net, err)
+		}
+	}
 	if err := e.cli.ContainerStart(ctx, created.ID, container.StartOptions{}); err != nil {
 		return "", fmt.Errorf("failed to start %s: %w", app.Name, err)
 	}
 	return created.ID, nil
+}
+
+// BuildImage tars the source dir and builds its Dockerfile into <tag>.
+func (e *Engine) BuildImage(ctx context.Context, sourceDir, tag string) error {
+	pr, pw := io.Pipe()
+	go func() { pw.CloseWithError(tarDir(sourceDir, pw)) }()
+	resp, err := e.cli.ImageBuild(ctx, pr, build.ImageBuildOptions{
+		Tags: []string{tag}, Remove: true, Dockerfile: "Dockerfile",
+	})
+	if err != nil {
+		return fmt.Errorf("build failed for %s: %w", tag, err)
+	}
+	defer resp.Body.Close()
+	// the build stream reports errors as JSON lines — surface them
+	dec := json.NewDecoder(resp.Body)
+	for {
+		var msg struct {
+			Error string `json:"error"`
+		}
+		if err := dec.Decode(&msg); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		if msg.Error != "" {
+			return fmt.Errorf("build failed: %s", msg.Error)
+		}
+	}
+}
+
+// tarDir streams a directory as an uncompressed tar (the docker build context).
+func tarDir(dir string, w io.Writer) error {
+	tw := tar.NewWriter(w)
+	defer tw.Close()
+	return filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		hdr, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+		hdr.Name = filepath.ToSlash(rel)
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		f, err := os.Open(p)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(tw, f)
+		return err
+	})
 }
 
 func (e *Engine) Stop(ctx context.Context, app string) error {

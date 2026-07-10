@@ -43,11 +43,35 @@ type AppRecord struct {
 	PublicURL   *string            `json:"publicUrl"`
 }
 
+// SystemRecord mirrors the TS SystemRecord (field names are the contract).
+type SystemRecord struct {
+	Name        string            `json:"name"`
+	Members     []string          `json:"members"`
+	MemberNodes map[string]string `json:"memberNodes,omitempty"`
+	Wires       map[string]string `json:"wires"`
+	SourceFile  string            `json:"sourceFile"`
+}
+
 type State struct {
-	Apps map[string]*AppRecord `json:"apps"`
+	Apps    map[string]*AppRecord    `json:"apps"`
+	Systems map[string]*SystemRecord `json:"systems"`
 
 	mu   sync.Mutex `json:"-"`
 	file string     `json:"-"`
+}
+
+// SystemsOf returns every system the app is a member of.
+func (s *State) SystemsOf(app string) []*SystemRecord {
+	var out []*SystemRecord
+	for _, sys := range s.Systems {
+		for _, m := range sys.Members {
+			if m == app {
+				out = append(out, sys)
+				break
+			}
+		}
+	}
+	return out
 }
 
 type NodeConfig struct {
@@ -69,7 +93,7 @@ func Load() (*State, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	s := &State{Apps: map[string]*AppRecord{}, file: filepath.Join(dir, "state.json")}
+	s := &State{Apps: map[string]*AppRecord{}, Systems: map[string]*SystemRecord{}, file: filepath.Join(dir, "state.json")}
 	data, err := os.ReadFile(s.file)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -82,6 +106,9 @@ func Load() (*State, error) {
 	}
 	if s.Apps == nil {
 		s.Apps = map[string]*AppRecord{}
+	}
+	if s.Systems == nil {
+		s.Systems = map[string]*SystemRecord{}
 	}
 	return s, nil
 }
