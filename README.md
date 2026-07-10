@@ -7,7 +7,7 @@
 **the localhost hyperscaler**
 
 Your machine, run like a cloud: containers, HTTP ingress, Postgres, secrets,
-public tunnels, and one-shot jobs — driven by a CLI, a live hi-fi-rack
+public tunnels, and one-shot jobs. Drive it from a CLI, a live hi-fi-rack
 dashboard, or AI agents speaking MCP.
 
 *one machine · one daemon · zero cloud accounts*
@@ -16,7 +16,7 @@ dashboard, or AI agents speaking MCP.
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/runslab/slab?quickstart=1)
 
-*↑ try slab in your browser — no install. Docker-in-Docker in a free Codespace: the daemon boots, the rack seeds itself, open port 7766.*
+*↑ try slab in your browser, no install. Docker-in-Docker in a free Codespace: the daemon boots, the rack seeds itself, open port 7766.*
 
 </div>
 
@@ -57,14 +57,14 @@ macOS and Linux; on Windows use WSL2.
 ## Sixty seconds
 
 ```bash
-slab deploy dockersamples/linux_tweet_app   # any github repo with a Dockerfile — no config needed
+slab deploy dockersamples/linux_tweet_app   # any github repo with a Dockerfile, no config needed
 open http://linux-tweet-app.localhost:8080  # routed by the ingress
 open http://localhost:7766                  # the rack
 ```
 
 No `slab.toml` in the repo? slab infers one: name from the repo, port from
 the Dockerfile's `EXPOSE`. Add a manifest when you want more (functions,
-postgres, secrets, private members) — see [docs/manifest.md](docs/manifest.md).
+postgres, secrets, private members); see [docs/manifest.md](docs/manifest.md).
 
 ## Three verbs
 
@@ -88,14 +88,14 @@ mounts + deploys from the browser.
 
 Not your vibe? It's **skinnable**: built-in `hyperscaler` skin (flat ops
 console, all hardware chrome stripped), light/dark for both, and custom
-skins are a single CSS file in `~/.slab/skins/` — see
+skins are a single CSS file in `~/.slab/skins/`; see
 [docs/skins.md](docs/skins.md).
 
 ## For agents
 
 slab ships an MCP server (`dist/mcp.js`, stdio): `slab_deploy`, `slab_run`
 (blocks and returns exit code + logs), `slab_logs`, `slab_secret_set`,
-`slab_expose`, `slab_system_deploy`, … — an agent can take a repo to a
+`slab_expose`, `slab_system_deploy`, and more. An agent can take a repo to a
 running, routable app, or execute sandboxed jobs, without ever learning
 Docker. See [docs/agents.md](docs/agents.md). The founding thesis: agents
 create infrastructure faster than humans can track it, so the platform
@@ -119,12 +119,12 @@ must make running things legible, bounded, and reversible.
   merged into the env at deploy.
 - **Public tunnels.** `slab expose <app>` → a free Cloudflare quick-tunnel
   URL for webhooks and demos.
-- **Named nodes.** Every daemon has an identity (`slab node`) — groundwork
+- **Named nodes.** Every daemon has an identity (`slab node`), groundwork
   for multi-node.
 - **Cloud targets.** `slab deploy --target aws`: services → App Runner,
   functions → Lambda, in your own account, no stored keys.
 
-More detail — full index at [docs/](docs/README.md):
+More detail (full index at [docs/](docs/README.md)):
 - [docs/getting-started.md](docs/getting-started.md) — install → deploy → everything
 - [docs/jobs.md](docs/jobs.md) — `slab run`: tests, builds, sandbox/agent jobs
 - [docs/cluster.md](docs/cluster.md) — nodes, peers, `--node`, the fleet view
@@ -136,14 +136,14 @@ More detail — full index at [docs/](docs/README.md):
 
 ## Status
 
-v0, weekend-spike maturity. Known sharp edges, honestly stated:
+v0. Known sharp edges, honestly stated:
 
 - **Single-node.** One daemon, one Docker host, no clustering, no HA.
 - **Secrets are plaintext on disk**, one JSON file per app under
   `~/.slab/secrets`, `chmod 600`. Fine for a single-user local machine, not
   a substitute for a real secrets manager.
-- **Quick-tunnel URLs rotate.** Every time a tunnel (re)opens — including on
-  daemon restart — Cloudflare hands out a new `trycloudflare.com` URL.
+- **Quick-tunnel URLs rotate.** Every time a tunnel (re)opens (including on
+  daemon restart), Cloudflare hands out a new `trycloudflare.com` URL.
   Don't hardcode it anywhere that matters.
 - **Function wake latency** depends on the image; the proxy waits up to 15s
   for the container to answer before giving up.
@@ -179,7 +179,7 @@ Rough order; nothing here is promised, everything here is intended.
    stock image. Timeout guardrail (default 30m), cancel, exit codes, logs,
    job bench on the dashboard, `slab_run` MCP tool for agents. Next up in
    this lane: the coding-agent job with a budget cap.
-2. **Overview / zoom-out mode** ✅ SHIPPED — a bird's-eye grid when there are
+2. **Fleet view** ✅ SHIPPED — a bird's-eye grid when there are
    many systems (imagine 1000 racks): each system a small tile, live status
    colors, click a tile to fly into that rack. The dashboard scales from
    one laptop to a wall of racks.
@@ -187,12 +187,12 @@ Rough order; nothing here is promised, everything here is intended.
    A second manifest that groups apps into a system: one Docker network per
    system (members reach each other by app name), `public = false` members
    get no host port at all (the VPC moment), `[wires]` binds one app's needs
-   to another's address. Membership is many-to-many — an app deploys once
+   to another's address. Membership is many-to-many: an app deploys once
    and can join several systems. Units never know about systems.
 4. **TTL + budget guardrails.** Every app gets an optional `ttl` and
    spend/uptime budget in slab.toml; the daemon reaps what nobody remembered
-   to turn off. Agents create infrastructure faster than humans track it —
-   this is the founding lesson of the project.
+   to turn off. Agents create infrastructure faster than humans track it:
+   the founding lesson of the project.
 5. **Named tunnels.** Stable hostnames on your own domain (Cloudflare named
    tunnels) instead of rotating trycloudflare URLs. Same code path as
    `expose`, config instead of chance.
@@ -203,7 +203,7 @@ Rough order; nothing here is promised, everything here is intended.
    `node = "garage"` on a member and a per-system trunk container on each
    node carries `http://<member>:<port>` across machines unchanged, private
    members included. Also done: the **fleet view** (zoom out and every
-   node renders as its own band — status badge, systems as tiles, dead nodes
+   node renders as its own band: status badge, systems as tiles, dead nodes
    shown honestly) and **`slab --node <name>`** targeting (any command
    against any peer: `slab --node garage deploy owner/repo`, resolved from
    the peer registry, tokens included) and **`slab run --node any`** — git-
@@ -213,19 +213,19 @@ Rough order; nothing here is promised, everything here is intended.
 7. **Multi-target providers — `slab deploy --target aws`** ✅ SHIPPED (v1).
    One manifest, rendered onto AWS in *your own account* by intent:
    services → App Runner (stable https URL), functions → Lambda (true
-   scale-to-zero), `public = false` → Fargate (beta). No stored keys —
+   scale-to-zero), `public = false` → Fargate (beta). No stored keys:
    slab runs as your existing AWS identity (EC2 instance role included).
    Guide: [docs/providers/aws.md](docs/providers/aws.md); plugin API for
    contributors (fly/gcp welcome):
    [docs/design/providers.md](docs/design/providers.md). Next in this
    lane: jobs + systems capabilities, native SDK implementation, more
    providers.
-8. **Go rewrite (v1.0, decided).** TypeScript was the right spike language —
-   MCP SDK first-class, product-in-a-day. Go is the right shipping language:
+8. **Go rewrite (v1.0, decided).** TypeScript was the right spike language
+   (MCP SDK first-class, product-in-a-day). Go is the right shipping language:
    the entire container/networking neighborhood lives there (Docker client,
    `httputil.ReverseProxy`, cloudflared itself), goroutines match the
    workload, and `GOOS=linux GOARCH=arm64` turns slab into a single static
-   binary you `brew install` — no Node runtime on the target machine. The
+   binary you `brew install`, with no Node runtime on the target machine. The
    manifest, HTTP API, and MCP tool surface are the product and stay
    byte-compatible; the daemon behind them is an implementation detail, and
    `examples/` doubles as the acceptance suite. (Interim option if
