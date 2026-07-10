@@ -2,3 +2,4 @@ node_modules/
 dist/
 *.log
 TOMORROW.md
+go/bin/
