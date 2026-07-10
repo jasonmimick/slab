@@ -425,6 +425,33 @@ node = "conf-peer"
       await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${spanApi}`, { method: 'DELETE' })
       try { docker('rm', '-f', `slab-trunk-conf-peer-${spanSys}`) } catch {}
 
+      // ── image shipping: build here, run there — no source on the peer ────
+      const shipApp = `conf-shipped-${RUN}`
+      const shipDir = path.join(dir, 'fixtures', shipApp)
+      fs.mkdirSync(shipDir, { recursive: true })
+      fs.writeFileSync(path.join(shipDir, 'Dockerfile'), 'FROM nginx:alpine\nEXPOSE 80\nRUN echo shipped-image > /usr/share/nginx/html/index.html\n')
+      const shipTag = `slab/${shipApp}:shipped`
+      execFileSync('docker', ['build', '-q', '-t', shipTag, shipDir], { stdio: 'pipe' })
+      const tarball = execFileSync('docker', ['save', shipTag], { maxBuffer: 512 * 1024 * 1024 })
+      const put = await fetch(`http://127.0.0.1:${PORT + 1}/v1/images`, {
+        method: 'PUT', headers: { 'content-type': 'application/x-tar' }, body: tarball,
+      })
+      ok(put.status === 204, 'PUT /v1/images loads a shipped tarball', String(put.status))
+      const inline = await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ manifest: { name: shipApp, type: 'service', port: 80, image: shipTag }, origin: 'conf-a' }),
+      })
+      ok(inline.status === 201, 'inline-manifest create on the peer (no source)', String(inline.status))
+      const shipDeploy = await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${shipApp}/deploy`, { method: 'POST' })
+      const shipped = await shipDeploy.json()
+      ok(shipDeploy.status === 200 && shipped?.app?.state === 'running', 'shipped app runs on the peer', JSON.stringify(shipped).slice(0, 120))
+      ok(docker('exec', `slab-${shipApp}`, 'cat', '/usr/share/nginx/html/index.html') === 'shipped-image',
+        'the running container is the shipped image')
+      const reDeploy = await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${shipApp}/deploy`, { method: 'POST' })
+      ok(reDeploy.status === 200, 'shipped app redeploys without source (manifest kept inline)', String(reDeploy.status))
+      await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${shipApp}`, { method: 'DELETE' })
+      try { docker('rmi', shipTag) } catch {}
+
       await api('DELETE', '/v1/peers/conf-peer')
     } finally {
       daemon2.kill()

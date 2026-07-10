@@ -112,5 +112,5 @@ func Resolve(source, baseDir string) (sourceDir string, gitURL *string, err erro
 		}
 		return dir, &u, nil
 	}
-	return "", nil, fmt.Errorf("cannot resolve app source %q — no directory at %s and it does not look like a git URL", source, asPath)
+	return "", nil, fmt.Errorf("cannot resolve app source %q — no directory at %s on this node and it does not look like a git URL (local paths exist only on the machine that owns them; deploy with a git source, or ship the built image: slab -N <node> deploy <dir>)", source, asPath)
 }

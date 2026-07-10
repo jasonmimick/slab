@@ -480,6 +480,19 @@ func (e *Engine) IsRunning(ctx context.Context, app string) bool {
 	info, err := e.cli.ContainerInspect(ctx, containerName(app))
 	return err == nil && info.State != nil && info.State.Running
 }
+
+// LoadImage streams a docker-save tarball into the local engine — the
+// receiving half of image shipping (slab -N <peer> deploy <dir>).
+func (e *Engine) LoadImage(ctx context.Context, r io.Reader) error {
+	resp, err := e.cli.ImageLoad(ctx, r)
+	if err != nil {
+		return fmt.Errorf("docker load failed: %w", err)
+	}
+	defer resp.Body.Close()
+	_, err = io.Copy(io.Discard, resp.Body)
+	return err
+}
+
 func (e *Engine) WaitReady(ctx context.Context, app string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {

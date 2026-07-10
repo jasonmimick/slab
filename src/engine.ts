@@ -148,7 +148,9 @@ export function createEngine(): Engine {
 
   async function buildImage(app: AppRecord): Promise<string> {
     if (app.manifest.image) {
-      await pullImage(app.manifest.image)
+      // shipped images (slab -N <peer> deploy) already live in the local
+      // engine — only pull what we don't have
+      if (!(await imageExists(app.manifest.image))) await pullImage(app.manifest.image)
       return app.manifest.image
     }
 
@@ -696,8 +698,20 @@ export function createEngine(): Engine {
     return `postgresql://${PG_USER}:${PG_PASSWORD}@host.docker.internal:${PG_PORT}/${dbName}`
   }
 
+  async function loadImage(stream: NodeJS.ReadableStream): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      docker.loadImage(stream, {}, (err: unknown, res: NodeJS.ReadableStream | undefined) => {
+        if (err) return reject(new Error(`docker load failed: ${errMsg(err)}`))
+        res?.on('data', () => { /* drain */ })
+        res?.on('end', resolve)
+        res?.on('error', (e) => reject(e))
+      })
+    })
+  }
+
   return {
     buildImage,
+    loadImage,
     runContainer,
     stopContainer,
     startContainer,

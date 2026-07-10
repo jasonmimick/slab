@@ -45,6 +45,11 @@ type apiClient struct {
 var localAPI = &apiClient{base: fmt.Sprintf("http://127.0.0.1:%d", daemonPort())}
 var api = localAPI // --node re-points this
 
+// set when --node targets a peer — the ship-image deploy path streams a
+// docker-save tarball at the peer's raw url
+var remotePeer *apiClient
+var remotePeerName string
+
 func (c *apiClient) req(method, path string, body any, out any) error {
 	var rd io.Reader
 	if body != nil {
@@ -80,6 +85,26 @@ func (c *apiClient) req(method, path string, body any, out any) error {
 		}
 		return json.Unmarshal(raw, out)
 	}
+	return nil
+}
+
+// reqStream sends a raw body (e.g. a docker-save tarball) — no JSON wrapping.
+func (c *apiClient) reqStream(method, path string, body io.Reader) error {
+	req, _ := http.NewRequest(method, c.base+path, body)
+	req.Header.Set("content-type", "application/x-tar")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := (&http.Client{Timeout: 30 * time.Minute}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("image ship failed: peer answered %d %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
 	return nil
 }
 
@@ -291,6 +316,8 @@ func pointAtNode(target, cmd string, rest []string) error {
 		if pm["name"] == target {
 			token, _ := pm["token"].(string)
 			api = &apiClient{base: fmt.Sprint(pm["url"]), token: token}
+			remotePeer = api
+			remotePeerName = target
 			return nil
 		}
 	}

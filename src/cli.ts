@@ -76,6 +76,9 @@ function sanitizeName(raw: string): string {
 // --node <name> re-points it at a peer (resolved from the local peer registry,
 // which carries each peer's URL + token).
 let api = client
+// Set when --node points at a peer — the ship-image deploy path needs the
+// peer's raw url + token to stream a docker-save tarball at it.
+let remotePeer: { name: string; url: string; token?: string } | null = null
 
 // Commands that touch THIS machine (files, daemon process) — meaningless remotely.
 const LOCAL_ONLY = new Set(['upgrade', 'open', 'close', 'token', 'advertise', 'daemon', 'init'])
@@ -126,6 +129,7 @@ program.hook('preAction', async (_thisCommand, actionCommand) => {
       throw new Error(`unknown node "${target}" — known nodes: ${known || 'none'}. Register with: slab peer add ${target} <url> --token <t>`)
     }
     api = clientFor(peer.url, peer.token)
+    remotePeer = { name: peer.name, url: peer.url, token: peer.token }
   } catch (err) {
     fail(err)
   }
@@ -177,6 +181,26 @@ program
     console.log(`created ${app.name} (${app.manifest.type}) -> ${appUrl(app, proxyPort)}`)
   }))
 
+// Ship a local docker image to a peer daemon: docker save | PUT /v1/images.
+function shipImage(image: string, peer: { url: string; token?: string }): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const save = spawn('docker', ['save', image], { stdio: ['ignore', 'pipe', 'inherit'] })
+    const u = new URL(peer.url + '/v1/images')
+    const httpMod = u.protocol === 'https:' ? require('https') : require('http')
+    const req = httpMod.request({
+      method: 'PUT', hostname: u.hostname, port: u.port, path: u.pathname,
+      headers: { 'content-type': 'application/x-tar', ...(peer.token ? { authorization: `Bearer ${peer.token}` } : {}) },
+    }, (res: { statusCode?: number; resume: () => void }) => {
+      res.resume()
+      if ((res.statusCode ?? 500) < 300) resolve()
+      else reject(new Error(`image ship failed: peer answered ${res.statusCode}`))
+    })
+    req.on('error', reject)
+    save.stdout.pipe(req)
+    save.on('exit', (code) => { if (code !== 0) { req.destroy(); reject(new Error(`docker save exited ${code}`)) } })
+  })
+}
+
 program
   .command('deploy [source]')
   .description('deploy an app (builds + starts) from a dir, git url, or app name')
@@ -184,6 +208,35 @@ program
   .action(action(async (dirOrName: string | undefined, opts: { target?: string }) => {
     const arg = dirOrName ?? process.cwd()
     const asDir = path.resolve(arg)
+
+    // Local dir + remote node: build HERE, ship the IMAGE, run THERE.
+    // The peer never needs the source, git access, or a build toolchain.
+    if (remotePeer && isDir(asDir)) {
+      const manifest = loadManifest(asDir)
+      let image = manifest.image
+      if (!image) {
+        image = `slab/${manifest.name}:shipped`
+        console.log(`building ${image} locally…`)
+        execSync(
+          `docker build -t ${JSON.stringify(image)} -f ${JSON.stringify(path.join(asDir, manifest.dockerfile ?? 'Dockerfile'))} ${JSON.stringify(asDir)}`,
+          { stdio: 'inherit', env: { ...process.env, DOCKER_BUILDKIT: '1' } },
+        )
+        console.log(`shipping ${image} -> ${remotePeer.name}…`)
+        await shipImage(image, remotePeer)
+      }
+      const { node: origin } = await client.health().catch(() => ({ node: undefined as string | undefined }))
+      await api.createApp({ manifest: { ...manifest, image }, origin: origin ?? 'remote' })
+        .catch((e: Error) => { if (!/exists/.test(e.message)) throw e })
+      const { app } = await api.deploy(manifest.name)
+      const { proxyPort } = await api.health()
+      if (app.state === 'running') {
+        console.log(`deployed ${app.name} on ${remotePeer.name} -> http://${app.name}.localhost:${proxyPort} (v${app.version}, image shipped from here)`)
+      } else {
+        console.log(`${app.name}: ${app.state}${app.error ? ` — ${app.error}` : ''}`)
+      }
+      return
+    }
+
     let name: string
     if (looksLikeGitUrl(arg) && !isDir(asDir)) {
       const { app } = await api.createApp({ gitUrl: arg, target: opts.target }).catch(async (e: Error) => {

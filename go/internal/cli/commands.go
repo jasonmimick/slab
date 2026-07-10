@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/runslab/slab/go/internal/gitsrc"
+	"github.com/runslab/slab/go/internal/manifest"
 	"github.com/runslab/slab/go/internal/state"
 )
 
@@ -147,6 +148,13 @@ func cmdDeploy(args []string) error {
 	if len(rest) > 0 {
 		arg = rest[0]
 	}
+
+	// Local dir + remote node: build HERE, ship the IMAGE, run THERE. The
+	// peer never needs the source, git access, or a build toolchain.
+	if absArg, _ := filepath.Abs(arg); remotePeer != nil && isDir(absArg) {
+		return shipDeploy(absArg)
+	}
+
 	name, err := resolveAppName(arg, target)
 	if err != nil {
 		return err
@@ -165,6 +173,79 @@ func cmdDeploy(args []string) error {
 	if out.App.State == "running" {
 		h, _ := health()
 		fmt.Printf("deployed %s -> %s (v%d)\n", out.App.Name, appURL(out.App.Name, h["proxyPort"]), out.App.Version)
+	} else {
+		msg := ""
+		if out.App.Error != nil {
+			msg = " — " + *out.App.Error
+		}
+		fmt.Printf("%s: %s%s\n", out.App.Name, out.App.State, msg)
+	}
+	return nil
+}
+
+func shipDeploy(dir string) error {
+	m, err := manifest.Load(dir)
+	if err != nil {
+		return err
+	}
+	image := m.Image
+	if image == "" {
+		image = "slab/" + m.Name + ":shipped"
+		fmt.Printf("building %s locally…\n", image)
+		df := m.Dockerfile
+		if df == "" {
+			df = "Dockerfile"
+		}
+		build := exec.Command("docker", "build", "-t", image, "-f", filepath.Join(dir, df), dir)
+		build.Env = append(os.Environ(), "DOCKER_BUILDKIT=1")
+		build.Stdout, build.Stderr = os.Stdout, os.Stderr
+		if err := build.Run(); err != nil {
+			return fmt.Errorf("docker build failed: %w", err)
+		}
+		fmt.Printf("shipping %s -> %s…\n", image, remotePeerName)
+		save := exec.Command("docker", "save", image)
+		pipe, err := save.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		if err := save.Start(); err != nil {
+			return err
+		}
+		if err := remotePeer.reqStream("PUT", "/v1/images", pipe); err != nil {
+			_ = save.Process.Kill()
+			return err
+		}
+		if err := save.Wait(); err != nil {
+			return fmt.Errorf("docker save failed: %w", err)
+		}
+	}
+	local, _ := localAPI.req2("GET", "/v1/health")
+	origin := "remote"
+	if local != nil {
+		if n, ok := local["node"].(string); ok {
+			origin = n
+		}
+	}
+	shipped := *m
+	shipped.Image = image
+	err = api.req("POST", "/v1/apps", map[string]any{"manifest": shipped, "origin": origin}, nil)
+	if err != nil && !strings.Contains(err.Error(), "exists") {
+		return err
+	}
+	var out struct {
+		App struct {
+			Name    string  `json:"name"`
+			State   string  `json:"state"`
+			Version int     `json:"version"`
+			Error   *string `json:"error"`
+		} `json:"app"`
+	}
+	if err := api.req("POST", "/v1/apps/"+m.Name+"/deploy", nil, &out); err != nil {
+		return err
+	}
+	if out.App.State == "running" {
+		h, _ := health()
+		fmt.Printf("deployed %s on %s -> %s (v%d, image shipped from here)\n", out.App.Name, remotePeerName, appURL(out.App.Name, h["proxyPort"]), out.App.Version)
 	} else {
 		msg := ""
 		if out.App.Error != nil {

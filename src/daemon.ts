@@ -189,7 +189,7 @@ async function main(): Promise<void> {
         throw new HttpError(400, (err as Error).message)
       }
     }
-    throw new HttpError(400, `cannot resolve app source "${source}" — no directory at ${asPath} and it does not look like a git URL`)
+    throw new HttpError(400, `cannot resolve app source "${source}" on node "${state.nodeName}" — no directory at ${asPath} here and it does not look like a git URL (local paths exist only on the machine that owns them; deploy with a git source, or ship the built image: slab -N <node> deploy <dir>)`)
   }
 
   // Shared app-creation logic used by POST /v1/apps and system member
@@ -247,8 +247,11 @@ async function main(): Promise<void> {
       if (record.gitUrl) {
         await cloneOrPull(record.gitUrl, path.basename(record.sourceDir))
       }
-      // manifest may have changed (upstream pull or local edits) — re-read it
-      record.manifest = loadManifest(record.sourceDir)
+      // manifest may have changed (upstream pull or local edits) — re-read it.
+      // Shipped apps have no source here; their manifest arrived inline.
+      if (!record.sourceDir.startsWith('shipped:')) {
+        record.manifest = loadManifest(record.sourceDir)
+      }
 
       // ── provider targets: build locally, push, hand off to the substrate ──
       const target = record.target ?? record.manifest.target
@@ -520,6 +523,13 @@ async function main(): Promise<void> {
     return (reqTimes.get(name) ?? []).filter((t) => now - t < 60_000).length
   }
 
+  // image ship: docker-save tar stream in, docker load here — build where
+  // the source lives, run where you point (slab -N <peer> deploy <dir>)
+  api.put('/v1/images', wrap(async (req, res) => {
+    await engine.loadImage(req)
+    res.status(204).end()
+  }))
+
   api.get('/v1/apps', wrap(async (req, res) => {
     const payload = { apps: Object.values(state.apps).map((a) => ({ ...a, reqPerMin: reqPerMin(a.name) })) }
     // Content negotiation: browsers get a readable view, machines get JSON
@@ -535,13 +545,33 @@ async function main(): Promise<void> {
     const gitUrlInput = req.body?.gitUrl
     const sourceDirInput = req.body?.sourceDir
     const targetInput = typeof req.body?.target === 'string' && req.body.target ? req.body.target : undefined
+    // inline manifest + image: the app arrives as an artifact (slab -N <peer>
+    // deploy ships the image separately via PUT /v1/images) — no source here
+    if (req.body?.manifest && typeof req.body.manifest === 'object') {
+      const m = req.body.manifest as Manifest
+      if (typeof m.name !== 'string' || !/^[a-z][a-z0-9-]{1,30}$/.test(m.name)) throw new HttpError(400, 'manifest.name invalid')
+      if (!Number.isInteger(m.port) || m.port < 1 || m.port > 65535) throw new HttpError(400, 'manifest.port invalid')
+      if (typeof m.image !== 'string' || !m.image) throw new HttpError(400, 'inline-manifest apps need manifest.image (ship it first: PUT /v1/images)')
+      if (state.apps[m.name]) throw new HttpError(409, `app "${m.name}" already exists`)
+      const record: AppRecord = {
+        name: m.name, sourceDir: `shipped:${String(req.body.origin ?? 'remote')}`, gitUrl: null,
+        manifest: { ...m, type: m.type === 'function' ? 'function' : 'service', public: m.public !== false, secrets: m.secrets ?? [], volumes: m.volumes ?? [], idle_timeout: m.idle_timeout ?? '5m', env: m.env ?? {} },
+        hostPort: allocateHostPort(state), containerId: null, target: undefined, ref: null, endpoint: null,
+        imageTag: null, version: 0, state: 'created', lastRequestAt: null,
+        createdAt: new Date().toISOString(), deployedAt: null, error: null, exposed: false, publicUrl: null,
+      }
+      state.apps[m.name] = record
+      saveState(state)
+      res.status(201).json({ app: record })
+      return
+    }
     let source: string
     if (typeof gitUrlInput === 'string' && gitUrlInput) {
       source = gitUrlInput
     } else if (typeof sourceDirInput === 'string' && path.isAbsolute(sourceDirInput)) {
       source = sourceDirInput
     } else {
-      throw new HttpError(400, 'body must be { sourceDir: <absolute path> } or { gitUrl } (+ optional target)')
+      throw new HttpError(400, 'body must be { sourceDir: <absolute path> } or { gitUrl } or { manifest, origin? } (+ optional target)')
     }
     if (targetInput && isProviderTarget(targetInput)) getProvider(targetInput)   // 400s early on unknown targets
     const record = await createAppFromSource(source, process.cwd(), undefined, targetInput)

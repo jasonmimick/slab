@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -51,12 +52,69 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, 200, map[string]any{"apps": apps})
 	})
 
+	// image ship: docker-save tar stream in, docker load here — build where
+	// the source lives, run where you point (slab -N <peer> deploy <dir>)
+	mux.HandleFunc("PUT /v1/images", func(w http.ResponseWriter, r *http.Request) {
+		if err := s.Eng.LoadImage(r.Context(), r.Body); err != nil {
+			errJSON(w, 500, err.Error())
+			return
+		}
+		w.WriteHeader(204)
+	})
+
 	mux.HandleFunc("POST /v1/apps", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			SourceDir string `json:"sourceDir"`
-			GitURL    string `json:"gitUrl"`
+			SourceDir string             `json:"sourceDir"`
+			GitURL    string             `json:"gitUrl"`
+			Manifest  *manifest.Manifest `json:"manifest"`
+			Origin    string             `json:"origin"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
+		// inline manifest + image: the app arrives as an artifact; the image
+		// was shipped separately via PUT /v1/images — no source here
+		if body.Manifest != nil {
+			m := body.Manifest
+			if !appNameRe.MatchString(m.Name) {
+				errJSON(w, 400, "manifest.name invalid")
+				return
+			}
+			if m.Port < 1 || m.Port > 65535 {
+				errJSON(w, 400, "manifest.port invalid")
+				return
+			}
+			if m.Image == "" {
+				errJSON(w, 400, "inline-manifest apps need manifest.image (ship it first: PUT /v1/images)")
+				return
+			}
+			if _, exists := s.St.Apps[m.Name]; exists {
+				errJSON(w, 409, fmt.Sprintf("app %q already exists", m.Name))
+				return
+			}
+			if m.Type != "function" {
+				m.Type = "service"
+			}
+			if m.IdleTimeout == "" {
+				m.IdleTimeout = "5m"
+			}
+			if m.Env == nil {
+				m.Env = map[string]string{}
+			}
+			if m.Secrets == nil {
+				m.Secrets = []string{}
+			}
+			if m.Volumes == nil {
+				m.Volumes = []string{}
+			}
+			origin := body.Origin
+			if origin == "" {
+				origin = "remote"
+			}
+			rec := &state.AppRecord{Name: m.Name, SourceDir: "shipped:" + origin, Manifest: m, State: state.Created}
+			s.St.Apps[m.Name] = rec
+			_ = s.St.Save()
+			writeJSON(w, 201, map[string]any{"app": rec})
+			return
+		}
 		source := body.GitURL
 		if source == "" {
 			source = body.SourceDir
@@ -360,11 +418,17 @@ func (s *Server) deployApp(ctx context.Context, rec *state.AppRecord) error {
 			return err
 		}
 	}
-	m, err := manifest.Load(rec.SourceDir) // manifest may have changed — re-read it
-	if err != nil {
-		return err
+	m := rec.Manifest
+	// manifest may have changed (upstream pull or local edits) — re-read it.
+	// Shipped apps have no source here; their manifest arrived inline.
+	if !strings.HasPrefix(rec.SourceDir, "shipped:") {
+		var err error
+		m, err = manifest.Load(rec.SourceDir)
+		if err != nil {
+			return err
+		}
+		rec.Manifest = m
 	}
-	rec.Manifest = m
 	rec.State = state.Building
 	_ = s.St.Save()
 
@@ -448,3 +512,5 @@ func (s *Server) deployApp(ctx context.Context, rec *state.AppRecord) error {
 	rec.Error = nil
 	return s.St.Save()
 }
+
+var appNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]{1,30}$`)
