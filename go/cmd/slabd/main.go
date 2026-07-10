@@ -20,6 +20,7 @@ import (
 	"github.com/runslab/slab/go/internal/api"
 	"github.com/runslab/slab/go/internal/engine"
 	"github.com/runslab/slab/go/internal/manifest"
+	"github.com/runslab/slab/go/internal/mcpserver"
 	"github.com/runslab/slab/go/internal/proxy"
 	"github.com/runslab/slab/go/internal/state"
 	"github.com/runslab/slab/go/internal/tunnel"
@@ -36,6 +37,13 @@ func envPort(name string, fallback int) int {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		// slabd mcp — the agent surface: stdio MCP server proxying the daemon API
+		if err := mcpserver.Run("slabd-dev"); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	st, err := state.Load()
 	if err != nil {
 		log.Fatalf("state: %v", err)

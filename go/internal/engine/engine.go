@@ -429,16 +429,27 @@ func (e *Engine) EnsurePostgres(ctx context.Context, appName string) (string, er
 	}
 
 	dbName := "slab_" + strings.ReplaceAll(appName, "-", "_")
-	code, out, err := e.execIn(ctx, name, []string{"psql", "-U", "slab", "-tAc",
-		fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s'", dbName)})
-	if err != nil {
-		return "", err
-	}
-	if strings.TrimSpace(out) != "1" {
-		code, out, err = e.execIn(ctx, name, []string{"psql", "-U", "slab", "-c", "CREATE DATABASE " + dbName})
-		if err != nil || (code != 0 && !strings.Contains(strings.ToLower(out), "already exists")) {
-			return "", fmt.Errorf("failed to create database %s: %s", dbName, strings.TrimSpace(out))
+	// the postgres image boots a TEMPORARY server during first-run init and
+	// shuts it down before the real one — pg_isready can answer in that
+	// window, so retry the database work through transient shutdowns
+	var lastOut string
+	for attempt, deadline := 0, time.Now().Add(30*time.Second); ; attempt++ {
+		code, out, err := e.execIn(ctx, name, []string{"psql", "-U", "slab", "-tAc",
+			fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s'", dbName)})
+		if err == nil && code == 0 {
+			if strings.TrimSpace(out) == "1" {
+				break
+			}
+			code, out, err = e.execIn(ctx, name, []string{"psql", "-U", "slab", "-c", "CREATE DATABASE " + dbName})
+			if err == nil && (code == 0 || strings.Contains(strings.ToLower(out), "already exists")) {
+				break
+			}
 		}
+		lastOut = strings.TrimSpace(out)
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("failed to create database %s: %s", dbName, lastOut)
+		}
+		time.Sleep(time.Second)
 	}
 	return fmt.Sprintf("postgresql://slab:slab@host.docker.internal:%d/%s", pgPort(), dbName), nil
 }

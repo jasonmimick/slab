@@ -432,6 +432,50 @@ node = "conf-peer"
     }
   }
 
+  // ── MCP: both daemons must expose the identical agent tool surface ──────
+  if (RUNG >= 5) {
+    const mcpCmd = DAEMON_CMD.includes('slabd') ? [cmd, [...args, 'mcp']] : ['node', ['dist/mcp.js']]
+    const mcp = spawn(mcpCmd[0], mcpCmd[1], {
+      env: { ...process.env, SLAB_DIR: dir, SLAB_PORT: String(PORT) },
+      stdio: ['pipe', 'pipe', 'ignore'],
+    })
+    const responses = []
+    let mcpBuf = ''
+    mcp.stdout.on('data', (d) => {
+      mcpBuf += d.toString()
+      let nl
+      while ((nl = mcpBuf.indexOf('\n')) >= 0) {
+        const line = mcpBuf.slice(0, nl).trim(); mcpBuf = mcpBuf.slice(nl + 1)
+        if (line) try { responses.push(JSON.parse(line)) } catch {}
+      }
+    })
+    const rpc = (id, method, params) => mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n')
+    const awaitId = async (id) => {
+      await waitFor(async () => responses.some((m) => m.id === id), `mcp response ${id}`, 15000)
+      return responses.find((m) => m.id === id)
+    }
+    try {
+      rpc(1, 'initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'conf', version: '0' } })
+      const init = await awaitId(1)
+      ok(init?.result?.serverInfo?.name?.includes('slab'), 'MCP initialize answers as slab', JSON.stringify(init?.result?.serverInfo))
+      mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n')
+      rpc(2, 'tools/list', {})
+      const toolsResp = await awaitId(2)
+      const names = (toolsResp?.result?.tools ?? []).map((t) => t.name).sort()
+      const expected = ['slab_create', 'slab_deploy', 'slab_expose', 'slab_hide', 'slab_jobs', 'slab_list',
+        'slab_logs', 'slab_remove', 'slab_run', 'slab_secret_list', 'slab_secret_set', 'slab_start',
+        'slab_status', 'slab_stop', 'slab_system_deploy', 'slab_system_list', 'slab_url']
+      ok(JSON.stringify(names) === JSON.stringify(expected), 'MCP tool surface is the canonical 17',
+        `got ${names.length}: ${names.join(',')}`)
+      rpc(3, 'tools/call', { name: 'slab_status', arguments: {} })
+      const status = await awaitId(3)
+      const statusText = status?.result?.content?.[0]?.text ?? ''
+      ok(statusText.includes('conf-a') && !status?.result?.isError, 'MCP slab_status reaches the daemon', statusText.slice(0, 120))
+    } finally {
+      mcp.kill()
+    }
+  }
+
   // shared-postgres teardown (namespaced by SLAB_PG_PORT)
   try { docker('rm', '-f', `slab-postgres-${PORT + 700}`) } catch {}
   try { docker('volume', 'rm', `slab-pgdata-${PORT + 700}`) } catch {}
