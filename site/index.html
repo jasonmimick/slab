@@ -318,6 +318,7 @@
     color: #8a877f; text-transform: uppercase; }
   .pour-note { color: var(--faint); font-size: 11px; margin-top: 14px; }
   .pour-note code { color: var(--dim); }
+  .ftnote { display: block; margin-top: 8px; font-size: 10px; letter-spacing: .02em; opacity: .8; font-style: italic; }
 
   /* agents: a transcript, not a pitch */
   .agents { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(24px, 4vw, 48px); align-items: start; }
@@ -524,13 +525,13 @@
 </header>
 
 <section>
-  <div class="sect-head"><h2>Three verbs</h2><span class="rule"></span><span class="tag">apps · jobs · systems</span></div>
+  <div class="sect-head"><h2>The elements</h2><span class="rule"></span><span class="tag">three nouns · three verbs · one verb per noun</span></div>
   <div class="cabinet verbrack">
     <div class="rack">
       <div class="unit u-run">
         <span class="unum">U01</span><span class="pwr"></span>
         <div class="plate">
-          <div class="name"><b>deploy</b><small>apps</small></div>
+          <div class="name"><b>apps</b><small>slab deploy</small></div>
           <div class="spec">any repo with a Dockerfile, zero config; services stay up, functions scale to zero</div>
         </div>
         <pre>$ slab deploy owner/repo
@@ -539,7 +540,7 @@
       <div class="unit u-run">
         <span class="unum">U02</span><span class="pwr"></span>
         <div class="plate">
-          <div class="name"><b>run</b><small>jobs</small></div>
+          <div class="name"><b>jobs</b><small>slab run</small></div>
           <div class="spec">run to completion; exit code back, logs kept, timeout reaps runaways</div>
         </div>
         <pre>$ slab run . -- npm test
@@ -549,7 +550,7 @@
       <div class="unit u-priv">
         <span class="unum">U03</span><span class="pwr"></span>
         <div class="plate">
-          <div class="name"><b>up</b><small>systems</small></div>
+          <div class="name"><b>systems</b><small>slab up</small></div>
           <div class="spec">apps wired on a private network; private members get no host port at all</div>
         </div>
         <pre>$ slab up ./system.toml
@@ -559,6 +560,23 @@
     </div>
     <div class="cabmark">slab<span class="chinfo">one manifest · toml · git-trackable</span></div>
   </div>
+  <p class="pour-note">wires are the edges, <code>node =</code> is the placement: that's the
+  whole grammar. everything else is composition.</p>
+</section>
+
+<section>
+  <div class="sect-head"><h2>Slab types</h2><span class="rule"></span><span class="tag">how a system carries load</span></div>
+  <div class="pour">
+    <div class="cast"><h3>Flat</h3><p>No wires. Members rest directly on the ingress: maximum clear ceiling height.</p><span class="stamp">no beams</span></div>
+    <div class="cast"><h3>One-way</h3><p>Load travels one direction. Pipelines, feeders, ingest chains.</p><span class="stamp">directed</span></div>
+    <div class="cast"><h3>Two-way</h3><p>Bending in all directions: members that call each other.</p><span class="stamp">mutual</span></div>
+    <div class="cast waffle"><h3>Waffle</h3><p>Spans machines. The trunks are the utilities concealed in the voids.</p><span class="stamp">multi-node</span></div>
+  </div>
+  <p class="pour-note">the dashboard stamps every system's nameplate with its type, computed
+  from the wire graph, not declared. <code>examples/</code> ships one of each.
+  <span class="ftnote">in graph terms: apps are vertices, wires are edges, <code>node =</code>
+  is the placement function. flat = no edges · one-way = acyclic · two-way = cyclic ·
+  waffle = the graph cut across machines. any shape you can draw fits in a page of toml.</span></p>
 </section>
 
 <section>
@@ -583,16 +601,6 @@
   </div>
 </section>
 
-<section>
-  <div class="sect-head"><h2>Choose your slab system</h2><span class="rule"></span><span class="tag">how a system carries load</span></div>
-  <div class="pour">
-    <div class="cast"><h3>Flat</h3><p>No wires. Members rest directly on the ingress: maximum clear ceiling height.</p><span class="stamp">no beams</span></div>
-    <div class="cast"><h3>One-way</h3><p>Load travels one direction. Pipelines, feeders, ingest chains.</p><span class="stamp">directed</span></div>
-    <div class="cast"><h3>Two-way</h3><p>Bending in all directions: members that call each other.</p><span class="stamp">mutual</span></div>
-    <div class="cast waffle"><h3>Waffle</h3><p>Spans machines. The trunks are the utilities concealed in the voids.</p><span class="stamp">multi-node</span></div>
-  </div>
-  <p class="pour-note">the dashboard stamps every system's nameplate with its type, computed from the wire graph, not declared. <code>examples/</code> ships one of each.</p>
-</section>
 
 <section>
   <div class="sect-head"><h2>Built for agents</h2><span class="rule"></span><span class="tag">mcp, first-class</span></div>

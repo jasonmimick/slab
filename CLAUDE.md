@@ -87,8 +87,12 @@ node = "some-peer"        # optional: run this member on a peer (the waffle move
   `~/.slab/src/examples/...` works because every install has the repo there
   (git-pull peers' `~/.slab/src` to the right commit first). The dev-checkout
   path only exists on euler.
-- System cast (docs): **one-way** (directed wiring), **two-way** (mutual),
-  **waffle** (spans nodes).
+- Slab types (computed from the wire graph, never declared; site section
+  "Slab types"): **flat** (no wires), **one-way** (directed/acyclic),
+  **two-way** (mutual/cyclic), **waffle** (spans nodes). Product framing:
+  three nouns (apps/jobs/systems), three verbs (deploy/run/up), one verb
+  per noun; wires = edges, `node =` = placement, graph theory kept to
+  footnote register in copy.
 
 ### Jobs
 `slab run <src> -- cmd` runs a container to completion (`slab jobs`,

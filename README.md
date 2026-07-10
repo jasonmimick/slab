@@ -66,7 +66,10 @@ No `slab.toml` in the repo? slab infers one: name from the repo, port from
 the Dockerfile's `EXPOSE`. Add a manifest when you want more (functions,
 postgres, secrets, private members); see [docs/manifest.md](docs/manifest.md).
 
-## Three verbs
+## The elements
+
+Three nouns, three verbs, one verb per noun. Wires are the edges, `node =`
+is the placement; everything else is composition.
 
 | verb | what it runs | example |
 |---|---|---|
