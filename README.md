@@ -167,6 +167,7 @@ confused you, or made you wish for one more verb:
   [discussions](https://github.com/runslab/slab/discussions) to **show
   your rack** (skins, clusters, weird setups welcome)
 - want `--target fly|gcp`? [claim a provider](CONTRIBUTING.md)
+- or just email [feedback@runslab.run](mailto:feedback@runslab.run)
 
 ## Hacking on slab itself
 
