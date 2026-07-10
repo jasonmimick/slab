@@ -18,7 +18,7 @@ One node = one daemon (`src/daemon.ts`), a single process serving:
   `http://<app>.localhost:8080` to the app's host port; wakes sleeping
   functions on request.
 - **Dashboard** at `localhost:7766` (`src/dashboard.ts`) — the rack UI
-  (breathing rack → board flip → solar-system zoom → skins). Rack metaphor is
+  (breathing rack → board flip → fleet zoom → skins). Rack metaphor is
   a product rule: UI language is racks/slabs/boards, not "instances".
 - The CLI **self-starts the daemon** when it's unreachable.
 

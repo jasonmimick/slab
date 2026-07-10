@@ -141,7 +141,7 @@ ingress still fronts them. Guide: [providers/aws.md](providers/aws.md).
 ## more machines
 
 One line installs slab on the next machine; a couple more make them a
-cluster — shared dashboard (the solar system), `slab --node <name>`
+cluster — shared dashboard (the fleet view), `slab --node <name>`
 targeting, jobs scheduled to the least-busy node, systems spanning
 machines. See [cluster.md](cluster.md).
 

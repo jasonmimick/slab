@@ -226,7 +226,7 @@ export function dashboardHtml(proxyPort: number): string {
   body.overview .deck { display: none; }
   body.overview .jobdeck { display: none; }
   #overview .ovgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
-  /* solar system: one band per node — the sun badge glows if it answers */
+  /* fleet: one band per node — the status badge glows if it answers */
   .nodeband {
     border: 1px solid var(--edge2); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;
     background: linear-gradient(180deg, var(--cab-hi), var(--cab-lo));
@@ -1114,7 +1114,7 @@ async function load() {
   render()
   renderJobs()
   if (benchSys) benchRender()
-  if (overviewOn) loadFleet()   // refreshes peers and re-renders the solar system
+  if (overviewOn) loadFleet()   // refreshes peers and re-renders the fleet
 }
 async function navStatus() {
   const r = await fetch('/v1/health')
@@ -1590,7 +1590,7 @@ async function unpatch(sysName, key) {
 }
 
 
-// ── overview: zoom out to the solar system — every node, every system ─────────
+// ── overview: zoom out to the fleet — every node, every system ─────────
 let overviewOn = false
 let fleetCache = null    // nodes from /v1/fleet (self + peers); null until first fetch
 async function loadFleet() {
@@ -1657,7 +1657,7 @@ function renderOverview() {
   // before the first fleet answer (or with no peers) fall back to local data
   const nodes = fleetCache ?? [{ name: 'this node', self: true, reachable: true, url: null, apps: appsCache, systems: systemsCache }]
   const totalApps = nodes.reduce((n, x) => n + x.apps.length, 0)
-  let html = '<div class="ovhead"><h2>solar system</h2><span>'
+  let html = '<div class="ovhead"><h2>fleet</h2><span>'
     + nodes.length + ' node' + (nodes.length === 1 ? '' : 's') + ' · ' + totalApps + ' apps · click a tile to fly in</span></div>'
   html += nodes.map(nodeBand).join('')
   document.getElementById('overview').innerHTML = html

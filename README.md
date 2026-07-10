@@ -127,7 +127,7 @@ must make running things legible, bounded, and reversible.
 More detail — full index at [docs/](docs/README.md):
 - [docs/getting-started.md](docs/getting-started.md) — install → deploy → everything
 - [docs/jobs.md](docs/jobs.md) — `slab run`: tests, builds, sandbox/agent jobs
-- [docs/cluster.md](docs/cluster.md) — nodes, peers, `--node`, the solar system
+- [docs/cluster.md](docs/cluster.md) — nodes, peers, `--node`, the fleet view
 - [docs/manifest.md](docs/manifest.md) — complete `slab.toml` reference
 - [docs/agents.md](docs/agents.md) — the MCP tool surface for agents
 - [docs/api.md](docs/api.md) — the daemon HTTP API
@@ -202,8 +202,8 @@ Rough order; nothing here is promised, everything here is intended.
    that span nodes ([docs/design/trunks.md](docs/design/trunks.md)): put
    `node = "garage"` on a member and a per-system trunk container on each
    node carries `http://<member>:<port>` across machines unchanged, private
-   members included. Also done: the **solar system** (zoom out and every
-   node renders as its own band — sun badge, systems as tiles, dead nodes
+   members included. Also done: the **fleet view** (zoom out and every
+   node renders as its own band — status badge, systems as tiles, dead nodes
    shown honestly) and **`slab --node <name>`** targeting (any command
    against any peer: `slab --node garage deploy owner/repo`, resolved from
    the peer registry, tokens included) and **`slab run --node any`** — git-

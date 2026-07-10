@@ -40,8 +40,8 @@ the bearer token.
 
 ## what a cluster gives you
 
-**The solar system.** The dashboard's zoom-out (▦) shows every node as a
-band — a glowing sun badge per node (amber = answering, red = down, shown
+**The fleet.** The dashboard's zoom-out (▦) shows every node as a
+band — a glowing status badge per node (amber = answering, red = down, shown
 honestly), its systems as tiles with live status. Local tiles fly into the
 rack; remote ones open that node's dashboard.
 

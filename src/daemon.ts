@@ -1111,7 +1111,7 @@ async function main(): Promise<void> {
     res.json({ node: name })
   }))
 
-  // The solar system: this node + every peer, one payload. Peer fan-out is
+  // The fleet: this node + every peer, one payload. Peer fan-out is
   // bounded (3s each, parallel) and a dead node degrades to reachable:false
   // instead of failing the view.
   api.get('/v1/fleet', wrap(async (_req, res) => {

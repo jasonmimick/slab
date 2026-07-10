@@ -11,7 +11,7 @@ New here? [Install slab](../README.md#install), then read
 |---|---|
 | [getting-started.md](getting-started.md) | install → deploy → routes, logs, secrets, tunnels, functions |
 | [jobs.md](jobs.md) | `slab run` — one-shot workloads: tests, builds, sandbox/agent jobs |
-| [cluster.md](cluster.md) | multiple machines: nodes, peers, `--node` targeting, the solar system |
+| [cluster.md](cluster.md) | multiple machines: nodes, peers, `--node` targeting, the fleet view |
 | [manifest.md](manifest.md) | complete `slab.toml` reference (+ zero-manifest inference) |
 | [skins.md](skins.md) | dashboard skins: built-ins + build your own with one CSS file |
 | [agents.md](agents.md) | the MCP tool surface — slab as an AI agent's infrastructure |
