@@ -6,7 +6,7 @@
 
 **the localhost hyperscaler**
 
-Your machine, run like a cloud: containers, HTTP ingress, Postgres, secrets,
+Run a cloud on your machines: containers, HTTP ingress, databases, secrets,
 public tunnels, and one-shot jobs. Drive it from a CLI, a live dashboard,
 or AI agents speaking MCP.
 
