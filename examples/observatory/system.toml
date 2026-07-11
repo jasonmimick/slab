@@ -1,0 +1,14 @@
+# observatory — slab watching itself. prometheus scrapes the daemon's
+# /metrics; grafana (skinned) draws it. Deploy per node: each node gets its
+# own observatory of its own rack.  slab up examples/observatory
+#
+# Container resource metrics (cAdvisor) and log aggregation (Loki) need host
+# bind-mounts, which slab deliberately doesn't allow — see README. This v1 is
+# the slab-native core: fleet/app up-down + request rates, no host access.
+name = "observatory"
+
+[apps.prometheus]
+source = "./prometheus"
+
+[apps.grafana]
+source = "./grafana"

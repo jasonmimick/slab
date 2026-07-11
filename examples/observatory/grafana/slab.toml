@@ -1,0 +1,7 @@
+# Grafana — the face of the observatory. Public (the only member you browse).
+# Skinned to slab, anonymous admin (LAN demo), prometheus pre-wired, the
+# "slab · the rack" dashboard provisioned. State survives via the volume.
+name = "grafana"
+type = "service"
+port = 3000
+volumes = ["gfdata:/var/lib/grafana"]

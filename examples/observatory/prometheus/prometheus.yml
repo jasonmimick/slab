@@ -1,0 +1,16 @@
+# Scrapes the slab daemon on the host. host.docker.internal resolves to the
+# Docker host on Docker Desktop (mac/win); on Linux the daemon must add the
+# host-gateway. Default daemon API port is 7766 — change if yours differs.
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: slab
+    static_configs:
+      - targets: ['host.docker.internal:7766']
+# App-level metrics are OPT-IN, not scrape-everything: an app that exposes its
+# own /metrics gets discovered via the daemon's /v1/sd once it declares it.
+# Most apps don't serve Prometheus, so we don't blindly scrape every port
+# (that just fills the board with red 404s). Uncomment to enable discovery:
+#  - job_name: slab-apps
+#    http_sd_configs:
+#      - url: 'http://host.docker.internal:7766/v1/sd'

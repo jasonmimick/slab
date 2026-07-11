@@ -1,0 +1,7 @@
+# Prometheus — scrapes the slab daemon's /metrics. Private; only grafana
+# reads it (by name, prometheus:9090). TSDB survives redeploys via the volume.
+name = "prometheus"
+type = "service"
+port = 9090
+public = false
+volumes = ["tsdb:/prometheus"]
