@@ -14,21 +14,55 @@ import (
 
 var peerNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]{1,30}$`)
 
-// Auth mirrors the TS daemon: loopback is exempt, everything else needs
-// Authorization: Bearer <node token>.
+// isLoopback reports whether the request came from this machine (127.0.0.1/::1).
+func isLoopback(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// authCookie is port-scoped: cookies ignore ports, so two daemons on one host
+// (the conformance harness, a same-machine cluster) must not clobber each
+// other's session. Derived from the request Host, falling back to a bare name.
+func authCookie(r *http.Request) string {
+	if _, port, err := net.SplitHostPort(r.Host); err == nil && port != "" {
+		return "slab_token_" + port
+	}
+	return "slab_token"
+}
+
+// Auth mirrors the TS daemon: loopback is exempt, everything else needs the
+// node token — via Bearer header (API clients), a port-scoped session cookie
+// (a returning browser), or ?token= once (a browser's first navigation, which
+// can't set a header). A ?token= match also hands back the cookie so plain
+// page reloads keep working after the dashboard strips the token from the URL
+// (localStorage + the fetch wrapper only cover in-page XHR, not the reload).
 func (s *Server) Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err == nil {
-			ip := net.ParseIP(host)
-			if ip != nil && ip.IsLoopback() {
+		if isLoopback(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if s.Token != "" {
+			if r.Header.Get("Authorization") == "Bearer "+s.Token {
 				next.ServeHTTP(w, r)
 				return
 			}
-		}
-		if s.Token != "" && r.Header.Get("Authorization") == "Bearer "+s.Token {
-			next.ServeHTTP(w, r)
-			return
+			if c, err := r.Cookie(authCookie(r)); err == nil && c.Value == s.Token {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if r.URL.Query().Get("token") == s.Token {
+				http.SetCookie(w, &http.Cookie{
+					Name: authCookie(r), Value: s.Token, Path: "/",
+					HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 31536000,
+				})
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 		errJSON(w, 401, "unauthorized — non-loopback requests require Authorization: Bearer $SLAB_TOKEN (or open /?token=... once)")
 	})
@@ -119,7 +153,7 @@ func (s *Server) clusterRoutes(mux *http.ServeMux) {
 				node, err := fetchPeer(p)
 				if err != nil {
 					node = map[string]any{
-						"name": p.Name, "self": false, "reachable": false, "url": p.URL,
+						"name": p.Name, "self": false, "reachable": false, "url": p.URL, "token": p.Token,
 						"proxyPort": nil, "apps": []any{}, "systems": []any{}, "error": err.Error(),
 					}
 				}
@@ -132,6 +166,15 @@ func (s *Server) clusterRoutes(mux *http.ServeMux) {
 			peerNodes[res.idx] = res.node
 		}
 		nodes = append(nodes, peerNodes...)
+		// Peer tokens let the local dashboard mint a working "open peer rack"
+		// link (?token=…). Only hand them to a loopback caller — the same
+		// trust boundary that already grants full control of this node — never
+		// to a remote authenticated peer harvesting its siblings' tokens.
+		if !isLoopback(r) {
+			for _, n := range nodes {
+				delete(n, "token")
+			}
+		}
 		writeJSON(w, 200, map[string]any{"nodes": nodes})
 	})
 }
@@ -178,7 +221,7 @@ func fetchPeer(p *state.PeerRecord) (map[string]any, error) {
 		name = p.Name
 	}
 	return map[string]any{
-		"name": name, "self": false, "reachable": true, "url": p.URL,
+		"name": name, "self": false, "reachable": true, "url": p.URL, "token": p.Token,
 		"proxyPort": health.ProxyPort, "apps": appsResp.Apps, "systems": sysResp.Systems, "error": nil,
 	}, nil
 }

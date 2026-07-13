@@ -227,6 +227,14 @@
   .sunbadge a:hover { text-decoration: underline; }
   .sunbadge .nstats { margin-left: auto; font-size: 10px; color: var(--faint); letter-spacing: .08em; white-space: nowrap; }
   .sunbadge .nerr { color: var(--red); font-size: 10px; letter-spacing: .08em; }
+  /* direct app links for a peer node — tokenless, via this node's ingress */
+  .applinks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 12px;
+    border-top: 1px dashed var(--edge2); }
+  .applink { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; text-decoration: none;
+    color: var(--ink); background: var(--unit1); border: 1px solid var(--edge2); border-radius: 6px;
+    padding: 3px 9px 3px 7px; letter-spacing: .01em; transition: border-color .12s, transform .12s; }
+  .applink:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .applink .od { width: 7px; height: 7px; }
   .otile {
     background: linear-gradient(180deg, var(--unit1), var(--unit3)); border: 1px solid var(--edge2); border-radius: 10px;
     padding: 14px; cursor: pointer; position: relative; overflow: hidden;
@@ -1615,11 +1623,26 @@ function tileHtml(title, apps, tag, onclickJs, maxrpm) {
 }
 // One band per node: its sun badge + a tile per system (+ standalone slab).
 // Local tiles fly into the rack; remote tiles open that node's dashboard.
+// A peer's rack UI lives on its own origin (jasons-mac-mini:7766) with its own
+// token in localStorage — never seeded on this laptop. Carry the token in the
+// URL once; the dashboard bootstrap stashes it and strips the query string.
+function rackUrl(node) {
+  if (!node.url) return ''
+  return node.url + (node.token ? '/?token=' + encodeURIComponent(node.token) : '')
+}
+// A peer app opens through THIS node's ingress: <app>.<peer>.localhost:<proxy>
+// reverse-proxies to the peer's ingress with no token needed. So from the train,
+// clicking a mac-mini app just works — one rack you can address.
+function appUrl(node, appName) {
+  return node.self
+    ? 'http://' + appName + '.localhost:987654/'
+    : 'http://' + appName + '.' + node.name + '.localhost:987654/'
+}
 function nodeBand(node) {
   const running = node.apps.filter(a => a.state === 'running').length
   const rpm = node.apps.reduce((n, a) => n + (a.reqPerMin ?? 0), 0)
   const maxrpm = Math.max(1, ...node.apps.map(a => a.reqPerMin ?? 0))
-  const openRemote = node.url ? "window.open('" + esc(node.url) + "')" : ''
+  const openRemote = node.url ? "window.open('" + esc(rackUrl(node)) + "')" : ''
   const sorted = [...(node.systems ?? [])].sort((a, b) => a.name.localeCompare(b.name))
   const solo = node.apps.filter(a => !sorted.some(s => s.members.includes(a.name)))
   let tiles = sorted.map(sys =>
@@ -1628,13 +1651,21 @@ function nodeBand(node) {
   ).join('')
   if (solo.length) tiles += tileHtml('slab', solo, 'standalone', node.self ? "flyTo('cab-slab')" : openRemote, maxrpm)
   if (!node.apps.length) tiles = '<div class="bench-hint">' + (node.reachable ? 'no apps' : esc(node.error ?? 'unreachable')) + '</div>'
+  // Direct, tokenless links to each public app on a peer — the useful bit from a
+  // remote node. Private apps have no ingress, so they aren't linkable.
+  const links = node.self ? [] : node.apps
+    .filter(a => a.manifest.public !== false)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(a => '<a class="applink ' + a.state + '" href="' + esc(appUrl(node, a.name)) + '" target="_blank" title="open ' + esc(a.name) + ' on ' + esc(node.name) + '"><i class="od ' + a.state + '"></i>' + esc(a.name) + '</a>')
   return '<div class="nodeband' + (node.self ? ' here' : '') + (node.reachable ? '' : ' down') + '">'
     + '<div class="sunbadge"><i class="sun' + (node.reachable ? ' up' : '') + '"></i><b>' + esc(node.name) + '</b>'
     + (node.self ? '<span class="heretag">this node</span>'
-        : node.url ? '<a href="' + esc(node.url) + '" target="_blank">open &#8599;</a>' : '')
+        : node.url ? '<a href="' + esc(rackUrl(node)) + '" target="_blank">open rack &#8599;</a>' : '')
     + (node.reachable ? '' : '<span class="nerr">unreachable</span>')
     + '<span class="nstats">' + running + '/' + node.apps.length + ' up · ' + rpm + ' req/m</span>'
-    + '</div><div class="ovgrid">' + tiles + '</div></div>'
+    + '</div><div class="ovgrid">' + tiles + '</div>'
+    + (links.length ? '<div class="applinks">' + links.join('') + '</div>' : '')
+    + '</div>'
 }
 function renderOverview() {
   // before the first fleet answer (or with no peers) fall back to local data
