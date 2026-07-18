@@ -1,0 +1,20 @@
+# Dependabot: security patches + weekly dependency updates.
+# The Go module is the product; npm (src/) is the frozen TS legacy — it gets
+# security updates only (enabled repo-wide), no version-bump PRs here.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /go
+    schedule:
+      interval: weekly
+    groups:
+      go-deps:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
