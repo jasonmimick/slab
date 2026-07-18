@@ -44,15 +44,16 @@ curl -fsSL https://runslab.run/install | bash
 ```
 
 The installer checks your prerequisites (and tells you exactly how to fix
-any that are missing), clones slab to `~/.slab/src`, builds it, puts `slab`
-on your PATH, and starts the daemon. Re-run it any time to upgrade.
+any that are missing), downloads the `slab` binary for your platform from
+the latest release — **one static Go binary, no runtime** — puts it on your
+PATH, clones the examples catalog to `~/.slab/src`, and starts the daemon.
+Re-run it any time (or `slab upgrade`) to update.
 
 **Prerequisites** — the installer verifies all of these:
 
 | need | why | get it |
 |---|---|---|
 | **Docker** (engine running) | every app, job, and database is a container | [Docker Desktop](https://www.docker.com/products/docker-desktop) (mac) · `curl -fsSL https://get.docker.com \| sh` (linux) |
-| **Node.js ≥ 20** | the daemon + CLI runtime (until the Go rewrite) | `brew install node` · [nodejs.org](https://nodejs.org) |
 | **git** | cloning repos you deploy | `brew install git` |
 | *cloudflared* (optional) | only for `slab expose` public tunnels | `brew install cloudflared` |
 
@@ -102,7 +103,7 @@ skins are a single CSS file in `~/.slab/skins/`; see
 
 ## For agents
 
-slab ships an MCP server (`dist/mcp.js`, stdio): `slab_deploy`, `slab_run`
+slab ships an MCP server (`slab mcp`, stdio): `slab_deploy`, `slab_run`
 (blocks and returns exit code + logs), `slab_logs`, `slab_secret_set`,
 `slab_expose`, `slab_system_deploy`, and more. An agent can take a repo to a
 running, routable app, or execute sandboxed jobs, without ever learning
@@ -128,8 +129,15 @@ must make running things legible, bounded, and reversible.
   merged into the env at deploy.
 - **Public tunnels.** `slab expose <app>` → a free Cloudflare quick-tunnel
   URL for webhooks and demos.
-- **Named nodes.** Every daemon has an identity (`slab node`), groundwork
-  for multi-node.
+- **A fleet, not a machine.** `slab peer add` links daemons; systems span
+  nodes via **trunks**, any node's ingress reaches any node's app
+  (`grafana.garage.localhost`), `slab -N <peer>` targets any command at any
+  node, and cross-node deploys ship the built image — the peer never needs
+  your source.
+- **The rack watches itself.** The daemon serves Prometheus `/metrics`
+  (apps, systems, jobs, per-app req/min) and auto-ships container logs to
+  Loki when one is running. `slab up examples/observatory` gives you a
+  pre-wired Grafana + Prometheus + Loki stack per node.
 - **Cloud targets.** `slab deploy --target aws`: services → App Runner,
   functions → Lambda, in your own account, no stored keys.
 
@@ -147,7 +155,9 @@ More detail (full index at [docs/](docs/README.md)):
 
 v0 alpha. Current limits:
 
-- **Single-node.** One daemon, one Docker host, no clustering, no HA.
+- **No HA.** Multi-node works (peers, trunks, fleet ingress) but there's no
+  real scheduler yet — you say where things run, and nothing fails over
+  automatically.
 - **Secrets are plaintext on disk**, one JSON file per app under
   `~/.slab/secrets`, `chmod 600`. Fine for a single-user local machine, not
   a substitute for a real secrets manager.
@@ -171,12 +181,19 @@ confused you, or made you wish for one more verb:
 
 ## Hacking on slab itself
 
+The daemon, CLI, and MCP server are one Go binary (`go/`):
+
 ```bash
-git clone https://github.com/runslab/slab.git && cd slab
-npm install && npm run build
-node dist/daemon.js          # api :7766 + ingress :8080
-node dist/cli.js deploy examples/hello-fn
+git clone https://github.com/runslab/slab.git && cd slab/go
+go build -o bin/slab ./cmd/slab
+./bin/slab daemon            # api :7766 + ingress :8080
+./bin/slab deploy ../examples/hello-fn
 ```
+
+`scripts/conformance.js` is the spec — run it with
+`DAEMON_CMD="go/bin/slab daemon" node scripts/conformance.js`. The original
+TypeScript implementation (`src/`) is frozen as the reference the Go port
+was validated against; new features land in Go only.
 
 ## Roadmap
 
@@ -206,7 +223,7 @@ Rough order; nothing here is promised, everything here is intended.
 5. **Named tunnels.** Stable hostnames on your own domain (Cloudflare named
    tunnels) instead of rotating trycloudflare URLs. Same code path as
    `expose`, config instead of chance.
-6. **Multi-node.** Shipping in slices. Done: node identity (`slab node`),
+6. **Multi-node** ✅ SHIPPED (pending a real scheduler). Done: node identity (`slab node`),
    peers registry (`slab peer add garage http://garage:7766`), cluster auth
    (`SLAB_TOKEN` + `SLAB_BIND`/`SLAB_ADVERTISE`), and **trunks** — systems
    that span nodes ([docs/design/trunks.md](docs/design/trunks.md)): put
@@ -239,13 +256,14 @@ Rough order; nothing here is promised, everything here is intended.
    examples/pg-cluster is already the shape (primary + streaming replica
    behind pgbouncer); real failover means promoting the replica and
    repointing pgbouncer, which wants to be an agent verb, not a pager page.
-9. **Go rewrite (v1.0, decided).** TypeScript was the right spike language
-   (MCP SDK first-class, product-in-a-day). Go is the right shipping language:
-   the entire container/networking neighborhood lives there (Docker client,
-   `httputil.ReverseProxy`, cloudflared itself), goroutines match the
-   workload, and `GOOS=linux GOARCH=arm64` turns slab into a single static
-   binary you `brew install`, with no Node runtime on the target machine. The
-   manifest, HTTP API, and MCP tool surface are the product and stay
-   byte-compatible; the daemon behind them is an implementation detail, and
-   `examples/` doubles as the acceptance suite. (Interim option if
-   distribution itches sooner: `bun build --compile` on the existing code.)
+9. **Go rewrite** ✅ SHIPPED. TypeScript was the right spike language
+   (MCP SDK first-class, product-in-a-day); Go is the right shipping
+   language, and now it's THE language: one static binary
+   (`slab daemon · mcp · every CLI verb`), full parity with the TS daemon
+   (conformance 77/77 — apps, systems, jobs, secrets, postgres, trunks,
+   MCP, cluster ingress, image-ship, metrics), released for
+   darwin/linux × amd64/arm64 on every `v*` tag. The manifest, HTTP API,
+   and MCP surface stayed byte-compatible — the daemon behind them was an
+   implementation detail, as designed. The installer ships the binary; no
+   Node runtime on the target machine. The TS tree (`src/`) is frozen as
+   the validated reference.

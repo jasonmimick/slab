@@ -1,6 +1,6 @@
 # agents
 
-slab has a first-class MCP server (`src/mcp.ts`, built to `dist/mcp.js`)
+slab has a first-class MCP server (`slab mcp`, built into the binary)
 that exposes the same operations as the CLI and HTTP API as tools, so an AI
 agent can deploy, operate, and debug apps on slab without shelling out. It
 talks to the daemon exactly like the CLI does — over HTTP to
@@ -20,16 +20,15 @@ reads this format):
 {
   "mcpServers": {
     "slab": {
-      "command": "node",
-      "args": ["/absolute/path/to/slab/dist/mcp.js"]
+      "command": "slab",
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-Build first (`npm run build`) so `dist/mcp.js` exists. There are no
-required env vars; set `SLAB_DAEMON_URL` only if the daemon isn't on the
-default `127.0.0.1:7766`.
+There are no required env vars; set `SLAB_DAEMON_URL` only if the daemon
+isn't on the default `127.0.0.1:7766`.
 
 ## tool list
 

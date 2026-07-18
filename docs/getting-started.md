@@ -9,11 +9,12 @@ curl -fsSL https://runslab.run/install | bash
 (or the same script straight from the repo:
 `curl -fsSL https://raw.githubusercontent.com/runslab/slab/master/install.sh | bash`)
 
-The installer checks prerequisites (Docker with the engine running,
-Node ≥ 20, git; `cloudflared` optional — only `slab expose` uses it), clones
-slab to `~/.slab/src`, builds it, puts `slab` on your PATH, and starts the
-daemon. **Upgrading later is one command:** `slab upgrade` (git pull +
-rebuild + daemon restart; all state and config survive).
+The installer checks prerequisites (Docker with the engine running, git;
+`cloudflared` optional — only `slab expose` uses it), downloads the `slab`
+binary for your platform from the latest release (one static Go binary, no
+runtime), puts it on your PATH, clones the examples catalog to
+`~/.slab/src`, and starts the daemon. **Upgrading later is one command:**
+`slab upgrade` (all state and config survive).
 
 The daemon is one process serving the HTTP API on `:7766` and the ingress
 proxy on `:8080`. On boot it reconciles `~/.slab/state.json` against what
@@ -156,14 +157,14 @@ Everything is under `~/.slab` (override: `SLAB_DIR`):
 - `systems/<name>.toml` — manifests for systems created via dashboard/API
 - `trunks/<system>.js` — generated trunk scripts
 - `skins/<name>.css` — your custom dashboard skins
-- `src/` — slab itself (installer-managed; `slab upgrade` updates it)
+- `src/` — the slab repo (examples catalog; `slab upgrade` updates it)
 - `daemon.log`, `daemon.pid`
 
 ## hacking on slab itself
 
 ```bash
-git clone https://github.com/runslab/slab.git && cd slab
-npm install && npm run build
-node dist/daemon.js          # api :7766 + ingress :8080
-node dist/cli.js deploy examples/hello-fn
+git clone https://github.com/runslab/slab.git && cd slab/go
+go build -o bin/slab ./cmd/slab
+./bin/slab daemon            # api :7766 + ingress :8080
+./bin/slab deploy ../examples/hello-fn
 ```
