@@ -497,6 +497,33 @@ node = "conf-peer"
       await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${shipApp}`, { method: 'DELETE' })
       try { docker('rmi', shipTag) } catch {}
 
+      // ── issue #11: re-shipping a name that already exists non-shipped ───
+      // (deployed straight on the peer, or an adopted system member there)
+      // must win over the stale record, not silently 409 and leave the next
+      // deploy rebuilding from the old local source forever.
+      const reshipApp = `conf-reship-${RUN}`
+      const reshipDir = path.join(dir, 'fixtures', reshipApp)
+      fs.mkdirSync(reshipDir, { recursive: true })
+      fs.writeFileSync(path.join(reshipDir, 'slab.toml'), `name = "${reshipApp}"\ntype = "service"\nport = 80\nimage = "nginx:alpine"\n`)
+      await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sourceDir: reshipDir }) })
+      await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${reshipApp}/deploy`, { method: 'POST' })
+      const reshipTag = `slab/${reshipApp}:shipped`
+      fs.writeFileSync(path.join(reshipDir, 'Dockerfile'), 'FROM nginx:alpine\nEXPOSE 80\nRUN echo reshipped-image > /usr/share/nginx/html/index.html\n')
+      execFileSync('docker', ['build', '-q', '-t', reshipTag, reshipDir], { stdio: 'pipe' })
+      const reshipTarball = execFileSync('docker', ['save', reshipTag], { maxBuffer: 512 * 1024 * 1024 })
+      await fetch(`http://127.0.0.1:${PORT + 1}/v1/images`, { method: 'PUT', headers: { 'content-type': 'application/x-tar' }, body: reshipTarball })
+      const reshipCreate = await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ manifest: { name: reshipApp, type: 'service', port: 80, image: reshipTag }, origin: 'conf-a' }),
+      })
+      ok(reshipCreate.status === 200, 're-shipping an existing non-shipped app upserts instead of 409ing', String(reshipCreate.status))
+      const reshipDeploy = await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${reshipApp}/deploy`, { method: 'POST' })
+      ok(reshipDeploy.status === 200, 're-shipped app redeploys', String(reshipDeploy.status))
+      ok(docker('exec', `slab-${reshipApp}`, 'cat', '/usr/share/nginx/html/index.html') === 'reshipped-image',
+        'the running container is the freshly shipped image, not a rebuild of the stale local source (issue #11)')
+      await fetch(`http://127.0.0.1:${PORT + 1}/v1/apps/${reshipApp}`, { method: 'DELETE' })
+      try { docker('rmi', reshipTag) } catch {}
+
       await api('DELETE', '/v1/peers/conf-peer')
     } finally {
       daemon2.kill()

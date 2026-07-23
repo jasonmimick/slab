@@ -90,10 +90,6 @@ func (s *Server) Handler() http.Handler {
 				errJSON(w, 400, "inline-manifest apps need manifest.image (ship it first: PUT /v1/images)")
 				return
 			}
-			if _, exists := s.St.Apps[m.Name]; exists {
-				errJSON(w, 409, fmt.Sprintf("app %q already exists", m.Name))
-				return
-			}
 			if m.Type != "function" {
 				m.Type = "service"
 			}
@@ -112,6 +108,24 @@ func (s *Server) Handler() http.Handler {
 			origin := body.Origin
 			if origin == "" {
 				origin = "remote"
+			}
+			// re-ship of an existing name: this artifact is the new source of
+			// truth for the app's image, whatever created the record before
+			// (a local build on this node, an adopted system member, or an
+			// earlier ship) — upsert in place rather than 409ing. A silent
+			// 409 here used to leave the old record's real SourceDir alone,
+			// so the next deploy re-read *that* manifest and rebuilt the
+			// stale local vN image instead of running the freshly shipped
+			// one (issue #11: redeploys never picked up the new code).
+			// GitURL, HostPort, and Version carry over so re-shipping an
+			// already-shipped app doesn't reallocate its port or reset it.
+			if existing, exists := s.St.Apps[m.Name]; exists {
+				existing.SourceDir = "shipped:" + origin
+				existing.GitURL = nil
+				existing.Manifest = m
+				_ = s.St.Save()
+				writeJSON(w, 200, map[string]any{"app": existing})
+				return
 			}
 			rec := &state.AppRecord{Name: m.Name, SourceDir: "shipped:" + origin, Manifest: m, State: state.Created}
 			s.St.Apps[m.Name] = rec
